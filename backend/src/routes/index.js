@@ -1,19 +1,17 @@
 import { Router } from 'express';
-import tblOrderDetailsRoutes from './tblOrderDetails.routes.js';
-import acdIntervalRoutes from './acd_interval_denormalized_entity.routes.js';
+import drishtiReportRoutes from './drishti.report.routes.js';
 
 const router = Router();
 
 router.get('/health', (req, res) => {
   res.status(200).json({
-    success: true,
-    message: 'Server is healthy',
+    success:   true,
+    message:   'Server is healthy',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
+    uptime:    process.uptime(),
   });
 });
 
-router.use('/orders', tblOrderDetailsRoutes);
-router.use('/acd', acdIntervalRoutes);
+router.use('/reports/drishti', drishtiReportRoutes);
 
 export default router;
