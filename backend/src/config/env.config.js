@@ -40,6 +40,9 @@ const env = {
 
   // Date range (days) above which the report is processed as a background job
   LARGE_RANGE_DAYS: parseInt(process.env.LARGE_RANGE_DAYS, 10) || 90,
+
+  // How often to re-sync SQLite from PG + MSSQL (milliseconds)
+  SYNC_INTERVAL_MS: (parseInt(process.env.SYNC_INTERVAL_MINUTES, 10) || 60) * 60 * 1000,
 };
 
 export default env;

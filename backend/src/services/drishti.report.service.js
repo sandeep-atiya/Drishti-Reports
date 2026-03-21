@@ -1,5 +1,6 @@
 import drishtiReportRepository from '../repositories/report/drishti.report.repository.js';
 import { getCachedReport, setCachedReport } from '../utils/cache.js';
+import logger from '../utils/logger.js';
 
 const pct = (n, d) => (d > 0 ? `${Math.round((n / d) * 100)}%` : '0%');
 
@@ -26,15 +27,15 @@ const drishtiReportService = {
     // ── Cache check ───────────────────────────────────────────────────────
     const cached = await getCachedReport(startDate, endDate);
     if (cached) {
-      console.log(`[PERF] Cache hit for ${startDate} → ${endDate}`);
+      logger.info(`[PERF] Cache hit for ${startDate} → ${endDate}`);
       return cached;
     }
 
     const t0 = Date.now();
 
-    // ── Step 1: single PG query (one table scan instead of two) ──────────
+    // ── Step 1: calls per agent (SQLite when ready, PG fallback) ─────────
     const pgAgentRows = await drishtiReportRepository.getCallsByAgent({ startDate, endDate });
-    console.log(`[PERF] PG query done in ${Date.now() - t0}ms  (${pgAgentRows.length} agent rows)`);
+    logger.info(`[PERF] Calls query done in ${Date.now() - t0}ms  (${pgAgentRows.length} rows)`);
 
     // ── Step 2: derive campaign-level call totals from agent rows (no extra DB hit) ──
     const pgCampaignMap = {};
@@ -50,13 +51,13 @@ const drishtiReportService = {
     // unique campaign IDs for MSSQL filter
     const campaignIds = pgCampaignRows.map((r) => r.campaign_id).filter(Boolean);
 
-    // ── Step 3: both MSSQL queries in parallel ────────────────────────────
+    // ── Step 3: orders queries in parallel (SQLite when ready, MSSQL fallback) ──
     const t1 = Date.now();
     const [mssqlCampaignRows, mssqlAgentRows] = await Promise.all([
       drishtiReportRepository.getOrdersByCampaign({ startDate, endDate, campaignIds }),
       drishtiReportRepository.getOrdersByAgent({ startDate, endDate, campaignIds }),
     ]);
-    console.log(`[PERF] MSSQL queries done in ${Date.now() - t1}ms`);
+    logger.info(`[PERF] Orders queries done in ${Date.now() - t1}ms`);
 
     // ── Step 4: build campaign table ──────────────────────────────────────
     const campaignOrdersMap = {};
@@ -110,7 +111,7 @@ const drishtiReportService = {
     });
 
     const result = { campaignData, agentData };
-    console.log(`[PERF] Total: ${Date.now() - t0}ms`);
+    logger.info(`[PERF] Total: ${Date.now() - t0}ms`);
 
     // Store in cache (fire-and-forget — don't block the response)
     setCachedReport(startDate, endDate, result).catch(() => {});

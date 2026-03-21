@@ -5,7 +5,6 @@ let client = null;
 
 /**
  * Returns a singleton ioredis client.
- * BullMQ requires maxRetriesPerRequest: null.
  */
 export const getRedis = () => {
   if (!client) {
