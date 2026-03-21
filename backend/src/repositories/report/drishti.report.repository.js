@@ -2,6 +2,7 @@ import { QueryTypes } from 'sequelize';
 import { getMSSQLSequelize, getPGSequelize } from '../../connections/index.js';
 import { getSQLite } from '../../config/sqlite.js';
 import { isSyncReady } from '../../jobs/syncJob.js';
+import logger from '../../utils/logger.js';
 
 const CAMPAIGN_NAMES_SQL = `'Digital inbound', 'Inbound_2'`;
 
@@ -125,17 +126,41 @@ const msGetOrdersByAgent = ({ startDate, endDate, campaignIds }) => {
   );
 };
 
-// ── Public repository — auto-selects SQLite or fallback ──────────────────────
+// ── Public repository — SQLite first, live DB fallback on any error ───────────
 
 const drishtiReportRepository = {
-  getCallsByAgent: (params) =>
-    isSyncReady() ? sqliteGetCallsByAgent(params) : pgGetCallsByAgent(params),
+  getCallsByAgent: async (params) => {
+    if (isSyncReady()) {
+      try {
+        return await sqliteGetCallsByAgent(params);
+      } catch (err) {
+        logger.warn(`[Repo] SQLite calls failed, falling back to PostgreSQL: ${err.message}`);
+      }
+    }
+    return pgGetCallsByAgent(params);
+  },
 
-  getOrdersByCampaign: (params) =>
-    isSyncReady() ? sqliteGetOrdersByCampaign(params) : msGetOrdersByCampaign(params),
+  getOrdersByCampaign: async (params) => {
+    if (isSyncReady()) {
+      try {
+        return await sqliteGetOrdersByCampaign(params);
+      } catch (err) {
+        logger.warn(`[Repo] SQLite orders-by-campaign failed, falling back to MSSQL: ${err.message}`);
+      }
+    }
+    return msGetOrdersByCampaign(params);
+  },
 
-  getOrdersByAgent: (params) =>
-    isSyncReady() ? sqliteGetOrdersByAgent(params) : msGetOrdersByAgent(params),
+  getOrdersByAgent: async (params) => {
+    if (isSyncReady()) {
+      try {
+        return await sqliteGetOrdersByAgent(params);
+      } catch (err) {
+        logger.warn(`[Repo] SQLite orders-by-agent failed, falling back to MSSQL: ${err.message}`);
+      }
+    }
+    return msGetOrdersByAgent(params);
+  },
 };
 
 export default drishtiReportRepository;

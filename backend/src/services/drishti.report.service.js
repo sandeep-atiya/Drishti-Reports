@@ -113,8 +113,8 @@ const drishtiReportService = {
     const result = { campaignData, agentData };
     logger.info(`[PERF] Total: ${Date.now() - t0}ms`);
 
-    // Store in cache (fire-and-forget — don't block the response)
-    setCachedReport(startDate, endDate, result).catch(() => {});
+    // Store in cache (fire-and-forget — setCachedReport handles its own errors internally)
+    setCachedReport(startDate, endDate, result);
 
     return result;
   },
