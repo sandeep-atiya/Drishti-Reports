@@ -3,16 +3,19 @@
 -- CONCURRENTLY = no table lock, safe on live DB
 -- ============================================================
 
--- Primary index: date range + campaign filter (most critical)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_acd_date_campaign
-  ON acd_interval_denormalized_entity (ch_date_added, campaign_name)
-  WHERE ch_system_disposition = 'CONNECTED'
-    AND uch_talk_time > 5;
+-- Drop old partial indexes (they were missing conditions so PG couldn't use them)
+DROP INDEX CONCURRENTLY IF EXISTS idx_acd_date_campaign;
+DROP INDEX CONCURRENTLY IF EXISTS idx_acd_agent_date;
 
--- Secondary: covers the GROUP BY columns
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_acd_agent_date
-  ON acd_interval_denormalized_entity (ch_date_added, udh_user_id, username, ch_campaign_id)
-  WHERE ch_system_disposition = 'CONNECTED'
+-- ONE covering partial index that matches ALL WHERE conditions in the query.
+-- PG can do an index-only scan → no heap access → very fast even for large ranges.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_acd_report_covering
+  ON acd_interval_denormalized_entity (ch_date_added, udh_user_id, username, campaign_name, ch_campaign_id)
+  WHERE
+    ch_system_disposition = 'CONNECTED'
+    AND campaign_name IN ('Digital inbound', 'Inbound_2')
+    AND ch_hangup_details NOT IN ('Customer_Hangup_Phone', 'Customer_hangup_ui')
+    AND udh_disposition_code IS DISTINCT FROM 'Call_Drop'
     AND uch_talk_time > 5;
 
 

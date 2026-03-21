@@ -1,4 +1,5 @@
 import drishtiReportRepository from '../repositories/report/drishti.report.repository.js';
+import { getCachedReport, setCachedReport } from '../utils/cache.js';
 
 const pct = (n, d) => (d > 0 ? `${Math.round((n / d) * 100)}%` : '0%');
 
@@ -22,6 +23,13 @@ const metrics = ({ calls, orders, verified, verifiedAmount }) => {
 
 const drishtiReportService = {
   getReport: async ({ startDate, endDate }) => {
+    // ── Cache check ───────────────────────────────────────────────────────
+    const cached = await getCachedReport(startDate, endDate);
+    if (cached) {
+      console.log(`[PERF] Cache hit for ${startDate} → ${endDate}`);
+      return cached;
+    }
+
     const t0 = Date.now();
 
     // ── Step 1: single PG query (one table scan instead of two) ──────────
@@ -101,8 +109,13 @@ const drishtiReportService = {
       };
     });
 
+    const result = { campaignData, agentData };
     console.log(`[PERF] Total: ${Date.now() - t0}ms`);
-    return { campaignData, agentData };
+
+    // Store in cache (fire-and-forget — don't block the response)
+    setCachedReport(startDate, endDate, result).catch(() => {});
+
+    return result;
   },
 };
 

@@ -105,7 +105,7 @@ const Skeleton = () => (
    Main Page
 ══════════════════════════════════════════════ */
 const ReportsPage = ({ onMenuToggle }) => {
-  const { data, loading, error, fetchReport } = useReports();
+  const { data, loading, loadingMsg, error, fetchReport } = useReports();
   const [activeTab, setActiveTab] = useState('campaign');
 
   /* Aggregate campaign-level KPIs */
@@ -178,8 +178,18 @@ const ReportsPage = ({ onMenuToggle }) => {
           </div>
         )}
 
-        {/* Skeleton */}
-        {loading && <Skeleton />}
+        {/* Skeleton + loading message */}
+        {loading && (
+          <div className="space-y-3">
+            {loadingMsg && (
+              <div className="flex items-center gap-2 text-sm text-indigo-600 font-medium">
+                <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse shrink-0" />
+                {loadingMsg}
+              </div>
+            )}
+            <Skeleton />
+          </div>
+        )}
 
         {/* ── Data ── */}
         {!loading && data && (
