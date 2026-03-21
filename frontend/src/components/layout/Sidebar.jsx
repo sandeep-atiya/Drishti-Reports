@@ -90,7 +90,7 @@ const Sidebar = ({ activePage, onNavigate, collapsed, onToggleCollapse, mobileOp
 
       {!collapsed && (
         <div className="px-4 py-3 border-t border-slate-700/50">
-          <p className="text-[10px] text-slate-600">v1.0.0 · Drishti Reports</p>
+          <p className="text-[10px] text-slate-600">v{import.meta.env.VITE_APP_VERSION} · Drishti Reports</p>
         </div>
       )}
     </aside>
@@ -122,7 +122,7 @@ const Sidebar = ({ activePage, onNavigate, collapsed, onToggleCollapse, mobileOp
       <NavList activePage={activePage} onNavigate={onNavigate} collapsed={false} />
 
       <div className="px-4 py-3 border-t border-slate-700/50">
-        <p className="text-[10px] text-slate-600">v1.0.0 · Drishti Reports</p>
+        <p className="text-[10px] text-slate-600">v{import.meta.env.VITE_APP_VERSION} · Drishti Reports</p>
       </div>
     </aside>
   </>

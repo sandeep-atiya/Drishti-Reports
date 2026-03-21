@@ -92,6 +92,14 @@ const PgBtn = ({ onClick, disabled, children }) => (
 const ReportTable = ({ rows = [] }) => {
   const [page,     setPage]     = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [prevRows, setPrevRows] = useState(rows);
+
+  // Derived-state reset: when rows reference changes, reset page during render.
+  // This is the React-recommended alternative to a useEffect setState call.
+  if (prevRows !== rows) {
+    setPrevRows(rows);
+    setPage(1);
+  }
 
   const totals   = useMemo(() => computeTotals(rows), [rows]);
   const maxPages = Math.max(1, Math.ceil(rows.length / pageSize));

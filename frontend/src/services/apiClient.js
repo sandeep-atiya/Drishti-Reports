@@ -7,7 +7,12 @@ const apiClient = axios.create({
 
 apiClient.interceptors.response.use(
   (res) => res,
-  (err) => Promise.reject(err)
+  (err) => {
+    if (!err.response) {
+      return Promise.reject(new Error('Network error — check your connection and try again'));
+    }
+    return Promise.reject(err);
+  }
 );
 
 export default apiClient;
