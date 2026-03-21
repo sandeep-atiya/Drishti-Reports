@@ -47,7 +47,7 @@ const Pagination = ({ page, pageSize, total, onPage, onPageSize }) => {
           <select
             value={pageSize}
             onChange={(e) => { onPageSize(Number(e.target.value)); onPage(1); }}
-            className="appearance-none pl-2.5 pr-6 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50 text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+            className="appearance-none pl-2.5 pr-6 py-1 text-xs border border-slate-200 bg-slate-50 text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
           >
             {PAGE_SIZES.map((s) => <option key={s} value={s}>{s} / page</option>)}
           </select>
@@ -65,7 +65,7 @@ const Pagination = ({ page, pageSize, total, onPage, onPageSize }) => {
         {pages.map((p, i) => p === '…'
           ? <span key={`e${i}`} className="w-7 text-center text-slate-400 text-xs">…</span>
           : <button key={p} onClick={() => onPage(p)}
-              className={`w-7 h-7 rounded-lg text-xs font-semibold transition-all ${
+              className={`w-7 h-7 text-xs font-semibold transition-all ${
                 p === page ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
               }`}
             >{p}</button>
@@ -83,7 +83,7 @@ const Pagination = ({ page, pageSize, total, onPage, onPageSize }) => {
 
 const PgBtn = ({ onClick, disabled, children }) => (
   <button onClick={onClick} disabled={disabled}
-    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+    className="w-7 h-7 flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
     {children}
   </button>
 );
@@ -100,7 +100,7 @@ const ReportTable = ({ rows = [] }) => {
   if (!rows.length) {
     return (
       <div className="flex flex-col items-center gap-3 py-16">
-        <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center">
+        <div className="w-12 h-12 bg-slate-100 flex items-center justify-center">
           <svg className="w-6 h-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
               d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -117,7 +117,7 @@ const ReportTable = ({ rows = [] }) => {
   const ac = (col) => col.align === 'left' ? 'text-left' : col.align === 'center' ? 'text-center' : 'text-right';
 
   return (
-    <div className="rounded-xl overflow-hidden border border-slate-200">
+    <div className="overflow-hidden border border-slate-200">
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse" style={{ minWidth: COLS.reduce((s, c) => s + c.minW, 0) }}>
           {/* ── Sticky header ── */}

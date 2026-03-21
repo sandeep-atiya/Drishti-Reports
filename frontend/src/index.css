@@ -11,6 +11,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+
+/* 
 #root {
   width: 100%;
   max-width: 100%;
@@ -37,4 +39,4 @@ body {
 input[type="date"]::-webkit-calendar-picker-indicator {
   opacity: 0.6;
   cursor: pointer;
-}
+} */

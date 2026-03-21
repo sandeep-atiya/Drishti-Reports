@@ -72,7 +72,7 @@ const ReportFilters = ({ onFetch, loading }) => {
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); if (startDate && endDate) onFetch({ startDate, endDate }); }}
-      className="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-4"
+      className="bg-white border border-slate-200 shadow-sm px-5 py-4"
     >
       <div className="flex flex-wrap items-end gap-4">
 
@@ -84,7 +84,7 @@ const ReportFilters = ({ onFetch, loading }) => {
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
-            className="flex items-center gap-2 pl-3.5 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:border-indigo-400 hover:bg-white transition-all min-w-[180px] shadow-sm"
+            className="flex items-center gap-2 pl-3.5 pr-3 py-2.5 bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-indigo-400 hover:bg-white transition-all min-w-[180px] shadow-sm"
           >
             {active && <active.icon size={14} className="text-indigo-500 shrink-0" />}
             <span className="flex-1 text-left">{active?.label}</span>
@@ -92,7 +92,7 @@ const ReportFilters = ({ onFetch, loading }) => {
           </button>
 
           {open && (
-            <div className="absolute top-[calc(100%+8px)] left-0 z-50 w-52 bg-white border border-slate-200 rounded-xl shadow-xl py-1 overflow-hidden">
+            <div className="absolute top-[calc(100%+8px)] left-0 z-50 w-52 bg-white border border-slate-200 shadow-xl py-1 overflow-hidden">
               {PRESETS.map((p) => {
                 const Icon = p.icon;
                 const sel  = activeId === p.id;
@@ -111,7 +111,7 @@ const ReportFilters = ({ onFetch, loading }) => {
               })}
 
               {isCustom && (
-                <div className="mx-3 my-2 p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-2.5">
+                <div className="mx-3 my-2 p-3 bg-slate-50 border border-slate-100 space-y-2.5">
                   {[['From', startDate, setStartDate, null, endDate || todayStr()],
                     ['To',   endDate,   setEndDate,   startDate, todayStr()]
                   ].map(([lbl, val, setter, min, max]) => (
@@ -120,7 +120,7 @@ const ReportFilters = ({ onFetch, loading }) => {
                       <input
                         type="date" value={val} min={min} max={max}
                         onChange={(e) => setter(e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-400 transition-all"
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-400 transition-all"
                       />
                     </div>
                   ))}
@@ -136,7 +136,7 @@ const ReportFilters = ({ onFetch, loading }) => {
             <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
               Selected Range
             </label>
-            <div className="flex items-center gap-2 px-3.5 py-2.5 bg-indigo-50 border border-indigo-100 rounded-lg text-sm font-mono font-semibold text-indigo-700">
+            <div className="flex items-center gap-2 px-3.5 py-2.5 bg-indigo-50 border border-indigo-100 text-sm font-mono font-semibold text-indigo-700">
               <CalendarDays size={13} className="text-indigo-400 shrink-0" />
               <span>{startDate}</span>
               <span className="text-indigo-300 font-sans font-bold">→</span>
@@ -151,10 +151,10 @@ const ReportFilters = ({ onFetch, loading }) => {
           <button
             type="submit"
             disabled={loading || !startDate || !endDate}
-            className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-indigo-200/60"
+            className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-indigo-200/60"
           >
             {loading
-              ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Generating…</>
+              ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white animate-spin" />Generating…</>
               : <><Search size={14} />Generate Report</>
             }
           </button>

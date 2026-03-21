@@ -26,7 +26,7 @@ const NavList = ({ activePage, onNavigate, collapsed }) => (
               <button
                 onClick={() => onNavigate(id)}
                 title={collapsed ? label : undefined}
-                className={`w-full flex items-center rounded-lg text-sm font-medium transition-all duration-150 group relative
+                className={`w-full flex items-center text-sm font-medium transition-all duration-150 group relative
                   ${collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'}
                   ${activePage === id
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
@@ -38,7 +38,7 @@ const NavList = ({ activePage, onNavigate, collapsed }) => (
 
                 {/* tooltip when collapsed */}
                 {collapsed && (
-                  <span className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-xl border border-slate-700 transition-opacity duration-150">
+                  <span className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-xl border border-slate-700 transition-opacity duration-150">
                     {label}
                   </span>
                 )}
@@ -63,7 +63,7 @@ const Sidebar = ({ activePage, onNavigate, collapsed, onToggleCollapse, mobileOp
       <div className={`flex items-center h-14 shrink-0 border-b border-slate-700/50 transition-all duration-300
         ${collapsed ? 'justify-center px-0' : 'px-4 gap-3'}`}
       >
-        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shrink-0">
+        <div className="w-8 h-8 bg-blue-600 flex items-center justify-center shrink-0 shrink-0">
           <BarChart2 size={17} className="text-white" />
         </div>
         {!collapsed && (
@@ -79,7 +79,7 @@ const Sidebar = ({ activePage, onNavigate, collapsed, onToggleCollapse, mobileOp
       {/* Collapse toggle */}
       <button
         onClick={onToggleCollapse}
-        className={`flex items-center gap-2 mx-2 mb-2 px-3 py-2 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors text-xs font-medium
+        className={`flex items-center gap-2 mx-2 mb-2 px-3 py-2 text-slate-500 hover:text-white hover:bg-slate-800 transition-colors text-xs font-medium
           ${collapsed ? 'justify-center' : ''}`}
       >
         {collapsed
@@ -113,7 +113,7 @@ const Sidebar = ({ activePage, onNavigate, collapsed, onToggleCollapse, mobileOp
         </div>
         <button
           onClick={onMobileClose}
-          className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+          className="text-slate-400 hover:text-white p-1.5 hover:bg-slate-800 transition-colors"
         >
           <X size={18} />
         </button>
