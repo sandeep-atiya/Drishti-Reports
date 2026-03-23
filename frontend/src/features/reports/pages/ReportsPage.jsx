@@ -215,7 +215,7 @@ const ReportsPage = ({ onMenuToggle }) => {
                 />
                 <KpiCard
                   icon={TrendingUp}   label="Total Revenue"  color="orange"
-                  value={`₹${abbr(kpi.revenue)}`}
+                  value={`${abbr(kpi.revenue)}`}
                   sub={`₹${kpi.calls ? Math.round(kpi.revenue / kpi.calls).toLocaleString('en-IN') : 0} / call`}
                 />
               </div>
