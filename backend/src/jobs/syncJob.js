@@ -240,6 +240,87 @@ const syncOrders = async (db, syncFrom) => {
   logger.info(`[SyncJob] MSSQL orders — done: ${total} rows across ${chunk} chunk(s)`);
 };
 
+// ── Hangup sync helpers ───────────────────────────────────────────────────────
+
+const getMaxHangupDate = (db) => {
+  const row = db.prepare('SELECT MAX(summary_date) AS d FROM hangup_daily').get();
+  return row?.d || null;
+};
+
+const _upsertHangupRows = (db, rows) => {
+  if (!rows.length) return;
+  const upsert = db.prepare(`
+    INSERT OR REPLACE INTO hangup_daily
+      (summary_date, username, campaign_name,
+       agent_hangup_phone, agent_hangup_ui, customer_hangup_phone,
+       system_hangup, system_media, system_recording)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  db.transaction((rs) => {
+    for (const r of rs) {
+      upsert.run(
+        String(r.summary_date),
+        r.username,
+        r.campaign_name || '',
+        Number(r.agent_hangup_phone),
+        Number(r.agent_hangup_ui),
+        Number(r.customer_hangup_phone),
+        Number(r.system_hangup),
+        Number(r.system_media),
+        Number(r.system_recording)
+      );
+    }
+  })(rows);
+};
+
+const buildHangupQuery = (fromStr, toStr) => `
+  SELECT
+    ch_date_added::date                                                            AS summary_date,
+    username,
+    COALESCE(campaign_name, '')                                                    AS campaign_name,
+    COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'AGENT_HANGUP_PHONE')       AS agent_hangup_phone,
+    COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'AGENT_HANGUP_UI')          AS agent_hangup_ui,
+    COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'CUSTOMER_HANGUP_PHONE')    AS customer_hangup_phone,
+    COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'SYSTEM_HANGUP')            AS system_hangup,
+    COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'SYSTEM_MEDIA')             AS system_media,
+    COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'SYSTEM_RECORDING')         AS system_recording
+  FROM acd_interval_denormalized_entity
+  WHERE username IS NOT NULL AND username <> ''
+    ${fromStr ? `AND ch_date_added >= '${fromStr}'::date` : ''}
+    ${toStr   ? `AND ch_date_added <  '${toStr}'::date`  : ''}
+  GROUP BY ch_date_added::date, username, campaign_name`;
+
+const syncHangup = async (db, syncFrom) => {
+  if (!syncFrom) {
+    logger.info('[SyncJob] Hangup — FULL (first ever sync)');
+    const rows = await getPGSequelize().query(buildHangupQuery(null, null), { type: QueryTypes.SELECT });
+    logger.info(`[SyncJob] Hangup — full: ${rows.length} rows`);
+    _upsertHangupRows(db, rows);
+    return;
+  }
+
+  const today  = dayjs().startOf('day');
+  let   cursor = dayjs(syncFrom);
+  let   chunk  = 0;
+  let   total  = 0;
+
+  while (cursor.valueOf() <= today.valueOf()) {
+    const chunkEnd = cursor.add(CHUNK_DAYS, 'day');
+    const isLast   = chunkEnd.valueOf() > today.valueOf();
+    const fromStr  = cursor.format('YYYY-MM-DD');
+    const toStr    = isLast ? null : chunkEnd.format('YYYY-MM-DD');
+    chunk++;
+
+    const rows = await getPGSequelize().query(buildHangupQuery(fromStr, toStr), { type: QueryTypes.SELECT });
+    logger.info(`[SyncJob] Hangup chunk ${chunk} [${fromStr} → ${toStr ?? 'latest'}]: ${rows.length} rows`);
+    _upsertHangupRows(db, rows);
+    total += rows.length;
+    if (isLast) break;
+    cursor = chunkEnd;
+  }
+  logger.info(`[SyncJob] Hangup — done: ${total} rows across ${chunk} chunk(s)`);
+};
+
 const getMaxTransferDate = (db) => {
   const row = db.prepare('SELECT MAX(summary_date) AS d FROM transfer_daily').get();
   return row?.d || null;
@@ -344,10 +425,14 @@ export const runSync = async () => {
   const maxTransferDate  = getMaxTransferDate(db);
   const transferSyncFrom = maxTransferDate ? dayjs(maxTransferDate).subtract(2, 'day').format('YYYY-MM-DD') : null;
 
+  const maxHangupDate  = getMaxHangupDate(db);
+  const hangupSyncFrom = maxHangupDate ? dayjs(maxHangupDate).subtract(2, 'day').format('YYYY-MM-DD') : null;
+
   await Promise.all([
     syncCalls(db, callsSyncFrom),
     syncOrders(db, ordersSyncFrom),
     syncTransferCalls(db, transferSyncFrom),
+    syncHangup(db, hangupSyncFrom),
   ]);
 
   setLastSyncDate(db, dayjs().format('YYYY-MM-DD'));

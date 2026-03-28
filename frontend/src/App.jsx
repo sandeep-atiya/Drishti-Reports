@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Sidebar                  from './components/layout/Sidebar';
 import ReportsPage              from './features/reports/pages/ReportsPage';
 import TransferConversionPage   from './features/transferConversion/pages/TransferConversionPage';
+import SelfHangupPage           from './features/selfHangup/pages/SelfHangupPage';
 
 function App() {
   const [activePage,  setActivePage]  = useState('drishti-report');
@@ -46,6 +47,9 @@ function App() {
         )}
         {activePage === 'transfer-conversion' && (
           <TransferConversionPage onMenuToggle={() => setMobileOpen((o) => !o)} />
+        )}
+        {activePage === 'self-hangup' && (
+          <SelfHangupPage onMenuToggle={() => setMobileOpen((o) => !o)} />
         )}
       </main>
 

@@ -52,6 +52,21 @@ const initSchema = (db) => {
       PRIMARY KEY (summary_date, campaign_name)
     );
     CREATE INDEX IF NOT EXISTS idx_transfer_date ON transfer_daily (summary_date);
+
+    -- Pre-aggregated Self Hangup counts per agent per day (from PostgreSQL)
+    CREATE TABLE IF NOT EXISTS hangup_daily (
+      summary_date          TEXT    NOT NULL,
+      username              TEXT    NOT NULL,
+      campaign_name         TEXT    NOT NULL DEFAULT '',
+      agent_hangup_phone    INTEGER NOT NULL DEFAULT 0,
+      agent_hangup_ui       INTEGER NOT NULL DEFAULT 0,
+      customer_hangup_phone INTEGER NOT NULL DEFAULT 0,
+      system_hangup         INTEGER NOT NULL DEFAULT 0,
+      system_media          INTEGER NOT NULL DEFAULT 0,
+      system_recording      INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (summary_date, username, campaign_name)
+    );
+    CREATE INDEX IF NOT EXISTS idx_hangup_date ON hangup_daily (summary_date);
   `);
 };
 

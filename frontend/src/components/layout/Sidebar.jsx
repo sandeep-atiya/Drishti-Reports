@@ -1,4 +1,4 @@
-import { BarChart2, TrendingUp, ArrowRightLeft, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { BarChart2, TrendingUp, ArrowRightLeft, PhoneOff, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 const NAV = [
   {
@@ -6,6 +6,7 @@ const NAV = [
     items: [
       { id: 'drishti-report',       label: 'Drishti Report',       icon: TrendingUp      },
       { id: 'transfer-conversion',  label: 'Transfer Conversion',  icon: ArrowRightLeft  },
+      { id: 'self-hangup',          label: 'Self Hangup',          icon: PhoneOff        },
     ],
   },
 ];
