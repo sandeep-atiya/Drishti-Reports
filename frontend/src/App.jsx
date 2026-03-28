@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import Sidebar     from './components/layout/Sidebar';
-import ReportsPage from './features/reports/pages/ReportsPage';
+import Sidebar                  from './components/layout/Sidebar';
+import ReportsPage              from './features/reports/pages/ReportsPage';
+import TransferConversionPage   from './features/transferConversion/pages/TransferConversionPage';
 
 function App() {
   const [activePage,  setActivePage]  = useState('drishti-report');
@@ -42,6 +43,9 @@ function App() {
       <main className="flex-1 overflow-y-auto min-w-0">
         {activePage === 'drishti-report' && (
           <ReportsPage onMenuToggle={() => setMobileOpen((o) => !o)} />
+        )}
+        {activePage === 'transfer-conversion' && (
+          <TransferConversionPage onMenuToggle={() => setMobileOpen((o) => !o)} />
         )}
       </main>
 

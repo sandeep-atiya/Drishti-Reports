@@ -1,10 +1,11 @@
-import { BarChart2, TrendingUp, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { BarChart2, TrendingUp, ArrowRightLeft, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 const NAV = [
   {
     group: 'Reports',
     items: [
-      { id: 'drishti-report', label: 'Drishti Report', icon: TrendingUp },
+      { id: 'drishti-report',       label: 'Drishti Report',       icon: TrendingUp      },
+      { id: 'transfer-conversion',  label: 'Transfer Conversion',  icon: ArrowRightLeft  },
     ],
   },
 ];

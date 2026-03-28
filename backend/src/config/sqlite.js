@@ -41,6 +41,17 @@ const initSchema = (db) => {
       key   TEXT PRIMARY KEY,
       value TEXT
     );
+
+    -- Pre-aggregated Transfer Conversion data per campaign per day (from PostgreSQL)
+    CREATE TABLE IF NOT EXISTS transfer_daily (
+      summary_date      TEXT    NOT NULL,
+      campaign_name     TEXT    NOT NULL,
+      calls             INTEGER NOT NULL DEFAULT 0,
+      transfer_to_sales INTEGER NOT NULL DEFAULT 0,
+      transfer_phones   TEXT    NOT NULL DEFAULT '[]',
+      PRIMARY KEY (summary_date, campaign_name)
+    );
+    CREATE INDEX IF NOT EXISTS idx_transfer_date ON transfer_daily (summary_date);
   `);
 };
 

@@ -17,6 +17,20 @@ const CAMPAIGN_NAMES_SQL = `'Digital inbound', 'Inbound_2'`;
  */
 const CHUNK_DAYS = 30;
 
+// ── Transfer Conversion campaign mapping (mirrors transfer.report.repository.js) ─
+const TRANSFER_DIRECT_SQL  = `'Filtration_utilization', 'Filtration_Courtesy', 'Courtesy_1'`;
+const TRANSFER_CASE_SQL    = `CASE
+    WHEN campaign_name = 'Unayur_IN' AND queue_name = 'FreshAgentQueue'               THEN 'Fresh'
+    WHEN campaign_name = 'Unayur_IN' AND queue_name = 'Verification_PendingAgentQueue' THEN 'Verification Pending'
+    ELSE campaign_name
+  END`;
+
+const normPhone10 = (p) => {
+  if (!p) return null;
+  const d = String(p).replace(/\D/g, '');
+  return d.length >= 10 ? d.slice(-10) : null;
+};
+
 // In-memory flag — true once the first full sync finishes
 let syncReady = false;
 export const isSyncReady = () => syncReady;
@@ -226,6 +240,90 @@ const syncOrders = async (db, syncFrom) => {
   logger.info(`[SyncJob] MSSQL orders — done: ${total} rows across ${chunk} chunk(s)`);
 };
 
+const getMaxTransferDate = (db) => {
+  const row = db.prepare('SELECT MAX(summary_date) AS d FROM transfer_daily').get();
+  return row?.d || null;
+};
+
+const _upsertTransferRows = (db, rows) => {
+  if (!rows.length) return;
+  const upsert = db.prepare(`
+    INSERT OR REPLACE INTO transfer_daily
+      (summary_date, campaign_name, calls, transfer_to_sales, transfer_phones)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  db.transaction((rs) => {
+    for (const r of rs) {
+      const phones = [...new Set(
+        (r.transfer_phones || []).map(normPhone10).filter(Boolean)
+      )];
+      upsert.run(
+        String(r.summary_date),
+        r.campaign_name,
+        Number(r.calls),
+        Number(r.transfer_to_sales),
+        JSON.stringify(phones)
+      );
+    }
+  })(rows);
+};
+
+const syncTransferCalls = async (db, syncFrom) => {
+  const buildQuery = (fromStr, toStr) => `
+    SELECT
+      ch_date_added::date   AS summary_date,
+      ${TRANSFER_CASE_SQL}  AS campaign_name,
+      COUNT(*)::int         AS calls,
+      COUNT(*) FILTER (WHERE udh_disposition_code = 'Transfer_to_sales')::int AS transfer_to_sales,
+      ARRAY_REMOVE(
+        ARRAY_AGG(ch_phone) FILTER (WHERE udh_disposition_code = 'Transfer_to_sales'),
+        NULL
+      ) AS transfer_phones
+    FROM acd_interval_denormalized_entity
+    WHERE
+      ch_system_disposition = 'CONNECTED'
+      AND (
+        campaign_name IN (${TRANSFER_DIRECT_SQL})
+        OR (campaign_name = 'Unayur_IN' AND queue_name IN ('FreshAgentQueue', 'Verification_PendingAgentQueue'))
+      )
+      AND (ch_hangup_details IS NULL
+           OR ch_hangup_details NOT IN ('Customer_Hangup_Phone', 'Customer_hangup_ui'))
+      AND udh_disposition_code IS DISTINCT FROM 'Call_Drop'
+      AND uch_talk_time > 5
+      ${fromStr ? `AND ch_date_added >= '${fromStr}'::date` : ''}
+      ${toStr   ? `AND ch_date_added <  '${toStr}'::date`  : ''}
+    GROUP BY ch_date_added::date, ${TRANSFER_CASE_SQL}`;
+
+  if (!syncFrom) {
+    logger.info('[SyncJob] Transfer — FULL (first ever sync)');
+    const rows = await getPGSequelize().query(buildQuery(null, null), { type: QueryTypes.SELECT });
+    logger.info(`[SyncJob] Transfer — full: ${rows.length} rows`);
+    _upsertTransferRows(db, rows);
+    return;
+  }
+
+  const today  = dayjs().startOf('day');
+  let   cursor = dayjs(syncFrom);
+  let   chunk  = 0;
+  let   total  = 0;
+
+  while (cursor.valueOf() <= today.valueOf()) {
+    const chunkEnd = cursor.add(CHUNK_DAYS, 'day');
+    const isLast   = chunkEnd.valueOf() > today.valueOf();
+    const fromStr  = cursor.format('YYYY-MM-DD');
+    const toStr    = isLast ? null : chunkEnd.format('YYYY-MM-DD');
+    chunk++;
+
+    const rows = await getPGSequelize().query(buildQuery(fromStr, toStr), { type: QueryTypes.SELECT });
+    logger.info(`[SyncJob] Transfer chunk ${chunk} [${fromStr} → ${toStr ?? 'latest'}]: ${rows.length} rows`);
+    _upsertTransferRows(db, rows);
+    total += rows.length;
+    if (isLast) break;
+    cursor = chunkEnd;
+  }
+  logger.info(`[SyncJob] Transfer — done: ${total} rows across ${chunk} chunk(s)`);
+};
+
 // ── Main sync ─────────────────────────────────────────────────────────────────
 
 export const runSync = async () => {
@@ -243,10 +341,13 @@ export const runSync = async () => {
   const t0 = Date.now();
   logger.info(`[SyncJob] Starting — calls from ${callsSyncFrom ?? 'FULL'}, orders from ${ordersSyncFrom ?? 'FULL'}`);
 
-  // Run both DBs in parallel (each handles its own chunking internally)
+  const maxTransferDate  = getMaxTransferDate(db);
+  const transferSyncFrom = maxTransferDate ? dayjs(maxTransferDate).subtract(2, 'day').format('YYYY-MM-DD') : null;
+
   await Promise.all([
     syncCalls(db, callsSyncFrom),
     syncOrders(db, ordersSyncFrom),
+    syncTransferCalls(db, transferSyncFrom),
   ]);
 
   setLastSyncDate(db, dayjs().format('YYYY-MM-DD'));
