@@ -51,8 +51,8 @@ const selfHangupReportService = {
     return rows;
   },
 
-  getCampaigns: async () => {
-    const rows = await selfHangupRepository.getCampaignNames();
+  getCampaigns: async ({ startDate, endDate } = {}) => {
+    const rows = await selfHangupRepository.getCampaignNames({ startDate, endDate });
     return rows.map((r) => r.campaign_name).filter(Boolean);
   },
 };

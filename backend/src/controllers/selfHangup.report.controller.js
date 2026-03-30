@@ -91,10 +91,21 @@ export const getSelfHangupJobStatus = asyncHandler(async (req, res) => {
 });
 
 /**
- * GET /api/v1/reports/selfhangup/campaigns
- * Returns list of distinct campaign names for the filter dropdown.
+ * GET /api/v1/reports/selfhangup/campaigns?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+ * Returns distinct campaign names that appear in the given date range.
+ * startDate / endDate are optional — defaults to last 90 days when omitted.
  */
 export const getSelfHangupCampaigns = asyncHandler(async (req, res) => {
-  const campaigns = await selfHangupReportService.getCampaigns();
+  const { startDate, endDate } = req.query;
+
+  // Normalise to YYYY-MM-DD when provided (same helper as validation)
+  const toDateStr = (d) =>
+    d ? (d instanceof Date ? d : new Date(d)).toISOString().split('T')[0] : undefined;
+
+  const params = {};
+  if (startDate) params.startDate = toDateStr(startDate);
+  if (endDate)   params.endDate   = toDateStr(endDate);
+
+  const campaigns = await selfHangupReportService.getCampaigns(params);
   return res.status(200).json({ success: true, campaigns });
 });

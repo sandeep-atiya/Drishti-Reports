@@ -28,7 +28,7 @@ const sqliteGetHangupByAgent = ({ startDate, endDate, campaignName }) => {
 
   const rows = db.prepare(`
     SELECT
-      username,
+      username                   AS agent_name,
       SUM(agent_hangup_phone)    AS agent_hangup_phone,
       SUM(agent_hangup_ui)       AS agent_hangup_ui,
       SUM(customer_hangup_phone) AS customer_hangup_phone,
@@ -48,15 +48,21 @@ const sqliteGetHangupByAgent = ({ startDate, endDate, campaignName }) => {
   return Promise.resolve(rows);
 };
 
-const sqliteGetCampaignNames = () => {
+const sqliteGetCampaignNames = ({ startDate, endDate } = {}) => {
+  const dateFilter = startDate && endDate
+    ? 'AND summary_date >= ? AND summary_date < ?'
+    : '';
+  const params = startDate && endDate ? [startDate, endDate] : [];
+
   const rows = getSQLite()
     .prepare(`
       SELECT DISTINCT campaign_name
       FROM hangup_daily
       WHERE campaign_name IS NOT NULL AND campaign_name <> ''
+        ${dateFilter}
       ORDER BY campaign_name
     `)
-    .all();
+    .all(...params);
   return Promise.resolve(rows);
 };
 
@@ -82,7 +88,7 @@ const pgGetHangupByAgent = ({ startDate, endDate, campaignName }) => {
 
   return getPGSequelize().query(
     `SELECT
-       username                                                                        AS username,
+       username                                                                        AS agent_name,
        COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'AGENT_HANGUP_PHONE')        AS agent_hangup_phone,
        COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'AGENT_HANGUP_UI')           AS agent_hangup_ui,
        COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'CUSTOMER_HANGUP_PHONE')     AS customer_hangup_phone,
@@ -104,14 +110,26 @@ const pgGetHangupByAgent = ({ startDate, endDate, campaignName }) => {
   );
 };
 
-const pgGetCampaignNames = () =>
-  getPGSequelize().query(
+const pgGetCampaignNames = ({ startDate, endDate } = {}) => {
+  // If specific dates are provided use them (always fast — small scan window).
+  // Fallback: last 90 days so the query never does a full-table scan.
+  const dateFilter = startDate && endDate
+    ? `AND ch_date_added >= :startDate::date AND ch_date_added < :endDate::date`
+    : `AND ch_date_added >= CURRENT_DATE - INTERVAL '90 days'`;
+
+  return getPGSequelize().query(
     `SELECT DISTINCT campaign_name
      FROM acd_interval_denormalized_entity
-     WHERE campaign_name IS NOT NULL AND campaign_name <> ''
+     WHERE campaign_name IS NOT NULL
+       AND campaign_name <> ''
+       ${dateFilter}
      ORDER BY campaign_name`,
-    { type: QueryTypes.SELECT }
+    {
+      replacements: startDate && endDate ? { startDate, endDate } : {},
+      type: QueryTypes.SELECT,
+    }
   );
+};
 
 // ── Public repository — SQLite first, live PG fallback ────────────────────────
 
@@ -133,16 +151,16 @@ const selfHangupRepository = {
     }
   },
 
-  getCampaignNames: async () => {
+  getCampaignNames: async (params = {}) => {
     if (isSyncReady()) {
       try {
-        return await sqliteGetCampaignNames();
+        return await sqliteGetCampaignNames(params);
       } catch (err) {
         logger.warn(`[SelfHangup Repo] SQLite campaigns failed, falling back to PG: ${err.message}`);
       }
     }
     try {
-      return await pgGetCampaignNames();
+      return await pgGetCampaignNames(params);
     } catch (err) {
       logger.error(`[SelfHangup Repo] PG campaigns query failed: ${err.message}`);
       throw err;

@@ -13,9 +13,14 @@ export const fetchSelfHangupJobStatus = (jobId) =>
     .get(`/reports/selfhangup/jobs/${jobId}`)
     .then((r) => r.data);
 
-export const fetchSelfHangupCampaigns = () =>
+export const fetchSelfHangupCampaigns = ({ startDate, endDate } = {}) =>
   apiClient
-    .get('/reports/selfhangup/campaigns')
+    .get('/reports/selfhangup/campaigns', {
+      params: {
+        ...(startDate ? { startDate } : {}),
+        ...(endDate   ? { endDate }   : {}),
+      },
+    })
     .then((r) => r.data.campaigns || []);
 
 export const pollSelfHangupJobUntilDone = (jobId, { intervalMs = 3000, onProgress, signal } = {}) =>

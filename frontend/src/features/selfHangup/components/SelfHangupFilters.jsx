@@ -198,19 +198,52 @@ const SelfHangupFilters = ({ onFetch, loading }) => {
   const [camLoading,    setCamLoading]    = useState(true);
   const [camError,      setCamError]      = useState(false);
 
-  const dropRef = useRef(null);
+  const dropRef    = useRef(null);
+  const camTimerRef = useRef(null);
 
-  // Fetch campaign list on mount; retry once on failure
-  const loadCampaigns = () => {
+  const active       = PRESETS.find((p) => p.id === activeId);
+  const isCustomDate = activeId === 'custom-date';
+  const isCustomHour = activeId === 'custom-hour';
+
+  /**
+   * Derive the effective date-only start/end to pass to the campaigns API.
+   * For datetime mode, strip the time part so the campaign query stays a
+   * simple date filter. For date mode, use the stored values directly.
+   */
+  const effectiveStart = isCustomHour
+    ? (startDatetime ? startDatetime.substring(0, 10) : '')
+    : startDate;
+  const effectiveEnd = isCustomHour
+    ? (endDatetime ? endDatetime.substring(0, 10) : '')
+    : endDate;
+
+  // Re-fetch campaigns whenever the date range changes.
+  // Debounced 400ms so rapid changes (typing in custom range) don't spam the API.
+  const loadCampaigns = (sd, ed) => {
     setCamLoading(true);
     setCamError(false);
-    fetchSelfHangupCampaigns()
-      .then((list) => { setCampaigns(list); setCamError(false); })
+    const params = sd && ed ? { startDate: sd, endDate: ed } : {};
+    fetchSelfHangupCampaigns(params)
+      .then((list) => {
+        setCampaigns(list);
+        setCamError(false);
+        // Clear selection if it no longer exists in the new list
+        setCampaignName((prev) => (list.includes(prev) ? prev : ''));
+      })
       .catch(() => { setCampaigns([]); setCamError(true); })
       .finally(() => setCamLoading(false));
   };
 
-  useEffect(() => { loadCampaigns(); }, []);
+  useEffect(() => {
+    clearTimeout(camTimerRef.current);
+    if (!effectiveStart || !effectiveEnd) return;
+    camTimerRef.current = setTimeout(
+      () => loadCampaigns(effectiveStart, effectiveEnd),
+      400
+    );
+    return () => clearTimeout(camTimerRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveStart, effectiveEnd]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -218,10 +251,6 @@ const SelfHangupFilters = ({ onFetch, loading }) => {
     document.addEventListener('mousedown', fn);
     return () => document.removeEventListener('mousedown', fn);
   }, []);
-
-  const active        = PRESETS.find((p) => p.id === activeId);
-  const isCustomDate  = activeId === 'custom-date';
-  const isCustomHour  = activeId === 'custom-hour';
 
   const pick = (p) => {
     setActiveId(p.id);
