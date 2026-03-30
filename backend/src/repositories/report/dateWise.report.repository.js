@@ -21,9 +21,18 @@ const toMSSQLDt = (s) => {
 
 // ── PostgreSQL: total calls per agent per date ────────────────────────────────
 //
-// Uses uch_user_id (user channel history) as the agent identifier.
-// COUNT(DISTINCT ch_call_id) avoids double-counting calls that span
-// multiple 10-minute intervals (rec_no > 1 rows in the denormalised table).
+// Agent identifier : COALESCE(udh_user_id, username)
+//   - udh_user_id  = raw CRM user ID from user-disposition-history (most reliable)
+//   - username     = denormalised display name (fallback when udh_user_id is NULL)
+//   Both store the same CRM username string (e.g. "HammadBT1") that is also
+//   stored in tblOrderDetails.doctor_name on the MSSQL side.
+//
+// TO_CHAR(..., 'YYYY-MM-DD') returns a plain string — avoids Sequelize returning
+// a Date object whose .toISOString() would shift the date by the UTC offset on
+// IST (UTC+5:30) servers.
+//
+// COUNT(DISTINCT ch_call_id) avoids double-counting calls that span multiple
+// 10-minute intervals (rec_no > 1 rows in the denormalised table).
 
 export const pgGetCallsByAgentDate = ({ startDate, endDate }) => {
   const startExpr = isDatetime(startDate)
@@ -35,16 +44,20 @@ export const pgGetCallsByAgentDate = ({ startDate, endDate }) => {
 
   return getPGSequelize().query(
     `SELECT
-       ch_date_added::date                  AS call_date,
-       uch_user_id                          AS agent_name,
-       COUNT(DISTINCT ch_call_id)::int      AS calls
+       TO_CHAR(ch_date_added::date, 'YYYY-MM-DD')  AS call_date,
+       COALESCE(udh_user_id, username)              AS agent_id,
+       username                                     AS agent_name,
+       COUNT(DISTINCT ch_call_id)::int              AS calls
      FROM acd_interval_denormalized_entity
      WHERE ${startExpr}
        AND ${endExpr}
-       AND uch_user_id IS NOT NULL
-       AND uch_user_id <> ''
-     GROUP BY ch_date_added::date, uch_user_id
-     ORDER BY uch_user_id, ch_date_added::date`,
+       AND COALESCE(udh_user_id, username) IS NOT NULL
+       AND COALESCE(udh_user_id, username) <> ''
+     GROUP BY
+       TO_CHAR(ch_date_added::date, 'YYYY-MM-DD'),
+       COALESCE(udh_user_id, username),
+       username
+     ORDER BY username, TO_CHAR(ch_date_added::date, 'YYYY-MM-DD')`,
     {
       replacements: { startDate, endDate },
       type: QueryTypes.SELECT,
@@ -52,14 +65,22 @@ export const pgGetCallsByAgentDate = ({ startDate, endDate }) => {
   );
 };
 
-// ── MSSQL: order stats per agent (dialer) per date ───────────────────────────
+// ── MSSQL: order stats per agent (doctor_name) per date ──────────────────────
 //
-// FLOW: Calls → Orders created by those calls → Verified orders → Amounts
+// Column facts from tblOrderDetails.sql schema:
+//   doctor_name  varchar(100) ← the sales agent's CRM username (same string as
+//                               PG.udh_user_id / PG.username, e.g. "HammadBT1")
+//   verifier_name varchar(100) ← the verifier — a DIFFERENT person/role
+//   dialer       [int]          ← numeric extension (value = 0 in practice, NOT username)
+//   AgentID      [int]          ← numeric FK, NOT a username string
 //
-// "dialer"         = the sales agent who created the order (matches uch_user_id).
-// "Orders"         = all orders booked in the date range, grouped by agent + date.
-// "Verified"       = orders whose disposition_Code is 'VERIFIED' (any casing).
-// "Verified Amount"= SUM of total_amount for verified orders.
+// FLOW: Calls → Orders (doctor_name = agent) → Verified (disposition_Code = 'Verified')
+//
+// Date filter matches the Transfer to Sales report pattern exactly:
+//   createdOn >= CAST(startDate AS DATETIME)
+//   createdOn <  CAST(endDate   AS DATETIME)
+//
+// Join key: MSSQL LOWER(TRIM(doctor_name))  ↔  PG LOWER(TRIM(udh_user_id))
 
 export const msGetOrderStatsByAgent = ({ startDate, endDate }) => {
   const dtStart = toMSSQLDt(startDate);
@@ -68,7 +89,7 @@ export const msGetOrderStatsByAgent = ({ startDate, endDate }) => {
   return getMSSQLSequelize().query(
     `SELECT
        CONVERT(VARCHAR(10), createdOn, 120)                                           AS order_date,
-       LTRIM(RTRIM(ISNULL(dialer, '')))                                               AS agent_name,
+       LTRIM(RTRIM(ISNULL(doctor_name, '')))                                          AS agent_id,
        COUNT(*)                                                                        AS total_orders,
        SUM(CASE
              WHEN LOWER(LTRIM(RTRIM(ISNULL(disposition_Code, '')))) = 'verified'
@@ -81,11 +102,11 @@ export const msGetOrderStatsByAgent = ({ startDate, endDate }) => {
      FROM tblOrderDetails
      WHERE createdOn >= CAST('${dtStart}' AS DATETIME)
        AND createdOn <  CAST('${dtEnd}'   AS DATETIME)
-       AND dialer IS NOT NULL
-       AND LTRIM(RTRIM(dialer)) <> ''
+       AND doctor_name IS NOT NULL
+       AND LTRIM(RTRIM(doctor_name)) <> ''
      GROUP BY
        CONVERT(VARCHAR(10), createdOn, 120),
-       LTRIM(RTRIM(ISNULL(dialer, '')))`,
+       LTRIM(RTRIM(ISNULL(doctor_name, '')))`,
     { type: QueryTypes.SELECT }
   );
 };

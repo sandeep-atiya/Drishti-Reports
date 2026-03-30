@@ -7,35 +7,60 @@ const num = (v) => Number(v) || 0;
 const pct = (n, d) => (d > 0 ? `${((n / d) * 100).toFixed(1)}%` : '0.0%');
 
 /**
- * Normalise a DB date value to a YYYY-MM-DD string.
- * PostgreSQL may return Date objects or ISO strings; handle both.
+ * Normalise a DB date value to a "YYYY-MM-DD" string.
+ *
+ * PG query uses TO_CHAR(..., 'YYYY-MM-DD') so call_date always arrives as a
+ * plain string — no Date-object timezone issues.
+ * MSSQL uses CONVERT(VARCHAR(10), createdOn, 120) — also a plain string.
+ * Both paths are strings, so this function is a safe fallback.
  */
 const toDateStr = (v) => {
   if (!v) return null;
   if (typeof v === 'string') return v.substring(0, 10);
-  if (v instanceof Date)    return v.toISOString().substring(0, 10);
+  // Sequelize may still return a Date object in some drivers;
+  // use LOCAL date parts (not UTC) to stay in server timezone
+  if (v instanceof Date) {
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, '0');
+    const d = String(v.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
   return String(v).substring(0, 10);
 };
 
 /**
- * Case-insensitive, trimmed string key for agent-name matching.
- * PG usernames and MSSQL verifier_name may differ in casing.
+ * Case-insensitive, trimmed join key for agent-name matching.
+ * Both PG.udh_user_id and MSSQL.doctor_name store the same CRM username
+ * but casing/whitespace might differ.
  */
-const agentKey = (name) => (name || '').trim().toLowerCase();
+const agentKey = (name) => String(name || '').trim().toLowerCase();
 
 // ── Service ───────────────────────────────────────────────────────────────────
 
 const dateWiseReportService = {
   /**
    * Build a per-agent, per-date report by joining:
-   *   PostgreSQL → calls per agent per day
-   *   MS SQL     → orders / verified counts / amounts per agent (verifier_name) per day
    *
-   * Join key: DATE + agent username (case-insensitive)
+   *   PostgreSQL  → calls per agent per day
+   *                 agent_id = COALESCE(udh_user_id, username)
+   *                 e.g. "HammadBT1"
    *
-   * Columns returned:
-   *   Date | Agents | Calls | Orders | Verified | Verified Amount |
-   *   Verified Ticket Size | Order Con | Verified Con | Verification % | RPC
+   *   MS SQL      → orders / verified per agent per day
+   *                 agent_id = doctor_name (same CRM username string)
+   *                 e.g. "HammadBT1"
+   *
+   * Join key:  DATE  +  LOWER(TRIM(agent_id))
+   *
+   * Column logic:
+   *   Calls            = COUNT(DISTINCT ch_call_id) per agent per date (PG)
+   *   Orders           = COUNT(*) grouped by doctor_name + date (MSSQL)
+   *   Verified         = orders where disposition_Code = 'Verified'
+   *   Verified Amount  = SUM(total_amount) of verified orders
+   *   Ticket Size      = Verified Amount ÷ Verified
+   *   Order Con        = Orders ÷ Calls %
+   *   Verified Con     = Verified ÷ Calls %
+   *   Verification %   = Verified ÷ Orders %
+   *   RPC              = Verified Amount ÷ Calls
    */
   getReport: async ({ startDate, endDate }) => {
     const t0 = Date.now();
@@ -46,18 +71,17 @@ const dateWiseReportService = {
 
     if (!pgRows.length) return [];
 
-    // ── Step 2: MSSQL – order stats per agent (verifier_name) per date ───────
+    // ── Step 2: MSSQL – order stats per doctor_name per date ─────────────────
     const msRows = await dateWiseRepository.getOrderStatsByAgent({ startDate, endDate });
     logger.info(`[DateWise] MSSQL done: ${msRows.length} agent-date order rows (${Date.now() - t0}ms)`);
 
     // ── Step 3: Build MSSQL lookup map ───────────────────────────────────────
-    // Key: `${YYYY-MM-DD}|${agentNameLower}`  →  { orders, verified, verifiedAmount }
+    // Key: `${YYYY-MM-DD}|${agentNameLower}` → { orders, verified, verifiedAmount }
     const orderMap = new Map();
     for (const row of msRows) {
       const dateStr = toDateStr(row.order_date);
       if (!dateStr) continue;
-      const key = `${dateStr}|${agentKey(row.agent_name)}`;
-      // Sum up in case of duplicate keys (shouldn't happen, but defensive)
+      const key = `${dateStr}|${agentKey(row.agent_id)}`;
       const existing = orderMap.get(key);
       if (existing) {
         existing.orders         += num(row.total_orders);
@@ -74,36 +98,30 @@ const dateWiseReportService = {
 
     // ── Step 4: Assemble final rows ───────────────────────────────────────────
     const rows = pgRows.map((row) => {
-      const dateStr = toDateStr(row.call_date);
+      const dateStr = toDateStr(row.call_date);   // always a plain string from TO_CHAR
       const calls   = num(row.calls);
 
-      const key   = `${dateStr}|${agentKey(row.agent_name)}`;
+      // agent_id  = COALESCE(udh_user_id, username) from PG — same value as doctor_name in MSSQL
+      // agent_name = username from PG — used for display
+      const key   = `${dateStr}|${agentKey(row.agent_id)}`;
       const stats = orderMap.get(key) || { orders: 0, verified: 0, verifiedAmount: 0 };
 
       const { orders, verified, verifiedAmount } = stats;
 
-      // Verified Ticket Size = Verified Amount ÷ Verified Orders
       const verifiedTicketSize = verified > 0
         ? Math.round(verifiedAmount / verified)
         : 0;
 
-      // Order Conversion  = Orders ÷ Calls %
-      const orderCon = pct(orders, calls);
-
-      // Verified Conversion = Verified ÷ Calls %
-      const verifiedCon = pct(verified, calls);
-
-      // Verification % = Verified ÷ Total Orders %
+      const orderCon        = pct(orders,   calls);
+      const verifiedCon     = pct(verified, calls);
       const verificationPct = pct(verified, orders);
-
-      // RPC = Verified Amount ÷ Total Calls
-      const rpc = calls > 0
+      const rpc             = calls > 0
         ? (verifiedAmount / calls).toFixed(2)
         : '0.00';
 
       return {
         'Date':                 dateStr,
-        'Agents':               row.agent_name || 'Unknown',
+        'Agents':               row.agent_name || row.agent_id || 'Unknown',
         'Calls':                calls,
         'Orders':               orders,
         'Verified':             verified,

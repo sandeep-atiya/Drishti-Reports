@@ -30,8 +30,11 @@ const ac = (col) =>
  */
 const fmtDateDisplay = (val) => {
   if (!val) return '—';
+  const s = String(val);
+  // Non-date labels (e.g. 'TOTAL') pass through unchanged
+  if (!/^\d{4}-\d{2}-\d{2}/.test(s)) return s;
   try {
-    const [y, m, d] = String(val).substring(0, 10).split('-').map(Number);
+    const [y, m, d] = s.substring(0, 10).split('-').map(Number);
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return `${String(d).padStart(2, '0')}-${months[m - 1]}-${y}`;
   } catch {
