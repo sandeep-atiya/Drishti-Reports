@@ -2,6 +2,7 @@ import { Router } from 'express';
 import drishtiReportRoutes    from './drishti.report.routes.js';
 import transferReportRoutes   from './transfer.report.routes.js';
 import selfHangupReportRoutes from './selfHangup.report.routes.js';
+import dateWiseReportRoutes   from './dateWise.report.routes.js';
 
 const router = Router();
 
@@ -17,5 +18,6 @@ router.get('/health', (req, res) => {
 router.use('/reports/drishti',     drishtiReportRoutes);
 router.use('/reports/transfer',    transferReportRoutes);
 router.use('/reports/selfhangup',  selfHangupReportRoutes);
+router.use('/reports/datewise',    dateWiseReportRoutes);
 
 export default router;

@@ -3,6 +3,7 @@ import Sidebar                  from './components/layout/Sidebar';
 import ReportsPage              from './features/reports/pages/ReportsPage';
 import TransferConversionPage   from './features/transferConversion/pages/TransferConversionPage';
 import SelfHangupPage           from './features/selfHangup/pages/SelfHangupPage';
+import DateWisePage             from './features/dateWise/pages/DateWisePage';
 
 function App() {
   const [activePage,  setActivePage]  = useState('drishti-report');
@@ -50,6 +51,9 @@ function App() {
         )}
         {activePage === 'self-hangup' && (
           <SelfHangupPage onMenuToggle={() => setMobileOpen((o) => !o)} />
+        )}
+        {activePage === 'date-wise' && (
+          <DateWisePage onMenuToggle={() => setMobileOpen((o) => !o)} />
         )}
       </main>
 
