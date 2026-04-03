@@ -5,6 +5,7 @@ import TransferConversionPage   from './features/transferConversion/pages/Transf
 import SelfHangupPage           from './features/selfHangup/pages/SelfHangupPage';
 import DateWisePage             from './features/dateWise/pages/DateWisePage';
 import DateWiseCampaignPage    from './features/dateWiseCampaign/pages/DateWiseCampaignPage';
+import SalesConversionPage     from './features/salesConversion/pages/SalesConversionPage';
 
 function App() {
   const [activePage,  setActivePage]  = useState('drishti-report');
@@ -58,6 +59,9 @@ function App() {
         )}
         {activePage === 'date-wise-campaign' && (
           <DateWiseCampaignPage onMenuToggle={() => setMobileOpen((o) => !o)} />
+        )}
+        {activePage === 'sales-conversion' && (
+          <SalesConversionPage onMenuToggle={() => setMobileOpen((o) => !o)} />
         )}
       </main>
 

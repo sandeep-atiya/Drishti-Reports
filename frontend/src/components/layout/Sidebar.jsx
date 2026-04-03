@@ -1,4 +1,4 @@
-import { BarChart2, TrendingUp, ArrowRightLeft, PhoneOff, CalendarDays, Layers, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { BarChart2, TrendingUp, ArrowRightLeft, PhoneOff, CalendarDays, Layers, Users, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 const NAV = [
   {
@@ -9,6 +9,7 @@ const NAV = [
       { id: 'self-hangup',          label: 'Self Hangup',          icon: PhoneOff        },
       { id: 'date-wise',            label: 'Date Wise Report',     icon: CalendarDays    },
       { id: 'date-wise-campaign',   label: 'Date Wise Campaign',   icon: Layers          },
+      { id: 'sales-conversion',     label: 'Sales Conversion',     icon: Users           },
     ],
   },
 ];
