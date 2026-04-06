@@ -122,6 +122,10 @@ const DateWiseFilters = ({ onFetch, loading }) => {
       setStartDate(start);
       setEndDate(end);
       setOpen(false);
+    } else {
+      const t = todayStr();
+      setStartDate(t);
+      setEndDate(t);
     }
   };
 
@@ -191,7 +195,7 @@ const DateWiseFilters = ({ onFetch, loading }) => {
               {isCustomDate && (
                 <div className="mx-3 my-2 p-3 bg-slate-50 border border-slate-100 space-y-2.5">
                   {[
-                    ['From', startDate, setStartDate, null, endDate || todayStr()],
+                    ['From', startDate, setStartDate, null, todayStr()],
                     ['To',   endDate ? addDays(endDate, -1) : '',
                               (v) => setEndDate(addDays(v, 1)),
                               startDate, todayStr()],

@@ -63,7 +63,17 @@ const ReportFilters = ({ onFetch, loading }) => {
 
   const pick = (p) => {
     setActiveId(p.id);
-    if (p.get) { const { start, end } = p.get(); setStartDate(start); setEndDate(end); setOpen(false); }
+    if (p.get) {
+      const { start, end } = p.get();
+      setStartDate(start);
+      setEndDate(end);
+      setOpen(false);
+    } else {
+      // Custom Range: reset to today so calendar opens on the current month
+      const t = todayStr();
+      setStartDate(t);
+      setEndDate(t);
+    }
   };
 
   const active   = PRESETS.find((p) => p.id === activeId);
@@ -112,7 +122,7 @@ const ReportFilters = ({ onFetch, loading }) => {
 
               {isCustom && (
                 <div className="mx-3 my-2 p-3 bg-slate-50 border border-slate-100 space-y-2.5">
-                  {[['From', startDate, setStartDate, null, endDate || todayStr()],
+                  {[['From', startDate, setStartDate, null,       todayStr()],
                     ['To',   endDate,   setEndDate,   startDate, todayStr()]
                   ].map(([lbl, val, setter, min, max]) => (
                     <div key={lbl}>

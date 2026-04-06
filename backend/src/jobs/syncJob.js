@@ -1,4 +1,6 @@
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+dayjs.extend(utc);
 import { QueryTypes } from 'sequelize';
 import { getSQLite } from '../config/sqlite.js';
 import { getMSSQLSequelize, getPGSequelize } from '../connections/index.js';
@@ -181,19 +183,30 @@ const syncCalls = async (db, syncFrom) => {
 
 // ── Pull orders from MSSQL (chunked) ─────────────────────────────────────────
 
+// Convert an IST date string (YYYY-MM-DD) to its UTC equivalent for MSSQL.
+// IST = UTC+5:30, so IST midnight = UTC 18:30 of the previous day.
+// e.g. '2026-04-06' IST 00:00 → '2026-04-05 18:30:00' UTC
+const istDateToUtcStr = (yyyymmdd) =>
+  dayjs.utc(yyyymmdd).subtract(330, 'minute').format('YYYY-MM-DD HH:mm:ss');
+
 const syncOrders = async (db, syncFrom) => {
+  // IST-aware date expression: adds 5h30m to UTC createdOn before bucketing to date.
+  // This ensures an order at 03:00 IST (= 21:30 UTC previous day) is counted on
+  // the correct IST date, not the UTC date.
+  const IST_DATE = `CAST(DATEADD(MINUTE, 330, createdOn) AS DATE)`;
+
   if (!syncFrom) {
     logger.info('[SyncJob] MSSQL orders — FULL (first ever sync)');
     const rows = await getMSSQLSequelize().query(
       `SELECT
-         CAST(createdOn AS DATE) AS summary_date,
+         ${IST_DATE}                                                                    AS summary_date,
          campaign_Id,
          AgentID,
          COUNT(*) AS orders,
-         SUM(CASE WHEN disposition_Code = 'Verified' THEN 1    ELSE 0    END) AS verified,
+         SUM(CASE WHEN disposition_Code = 'Verified' THEN 1    ELSE 0    END)          AS verified,
          SUM(CASE WHEN disposition_Code = 'Verified' THEN ISNULL(total_amount,0) ELSE 0 END) AS verified_amount
        FROM tblOrderDetails
-       GROUP BY CAST(createdOn AS DATE), campaign_Id, AgentID`,
+       GROUP BY ${IST_DATE}, campaign_Id, AgentID`,
       { type: QueryTypes.SELECT }
     );
     logger.info(`[SyncJob] MSSQL orders — full: ${rows.length} rows`);
@@ -213,19 +226,25 @@ const syncOrders = async (db, syncFrom) => {
     const toStr    = isLast ? null : chunkEnd.format('YYYY-MM-DD');
     chunk++;
 
-    const toFilter = toStr ? `AND createdOn < CAST('${toStr}' AS DATETIME)` : '';
+    // Convert IST chunk boundaries to UTC for the WHERE clause.
+    // e.g. fromStr='2026-04-05' IST → WHERE createdOn >= '2026-04-04 18:30:00' UTC
+    const utcFrom   = istDateToUtcStr(fromStr);
+    const toFilter  = toStr
+      ? `AND createdOn < CAST('${istDateToUtcStr(toStr)}' AS DATETIME)`
+      : '';
+
     const rows = await getMSSQLSequelize().query(
       `SELECT
-         CAST(createdOn AS DATE) AS summary_date,
+         ${IST_DATE}                                                                    AS summary_date,
          campaign_Id,
          AgentID,
          COUNT(*) AS orders,
-         SUM(CASE WHEN disposition_Code = 'Verified' THEN 1    ELSE 0    END) AS verified,
+         SUM(CASE WHEN disposition_Code = 'Verified' THEN 1    ELSE 0    END)          AS verified,
          SUM(CASE WHEN disposition_Code = 'Verified' THEN ISNULL(total_amount,0) ELSE 0 END) AS verified_amount
        FROM tblOrderDetails
-       WHERE createdOn >= CAST('${fromStr}' AS DATETIME)
+       WHERE createdOn >= CAST('${utcFrom}' AS DATETIME)
          ${toFilter}
-       GROUP BY CAST(createdOn AS DATE), campaign_Id, AgentID`,
+       GROUP BY ${IST_DATE}, campaign_Id, AgentID`,
       { type: QueryTypes.SELECT }
     );
 

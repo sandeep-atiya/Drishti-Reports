@@ -2,6 +2,12 @@ import { QueryTypes } from 'sequelize';
 import { getMSSQLSequelize, getPGSequelize } from '../../connections/index.js';
 import logger from '../../utils/logger.js';
 import { getSQLite } from '../../config/sqlite.js';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+import timezone from 'dayjs/plugin/timezone.js';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 // These 3 campaigns are matched directly by campaign_name
 const DIRECT_CAMPAIGNS_SQL = `'Filtration_utilization', 'Filtration_Courtesy', 'Courtesy_1'`;
@@ -12,7 +18,11 @@ const DIRECT_CAMPAIGNS_SQL = `'Filtration_utilization', 'Filtration_Courtesy', '
 
 /**
  * Normalise any phone format to the last 10 digits.
- * Handles +91 prefix, leading zeros, spaces, dashes, etc.
+ * Handles all common formats:
+ *   +91XXXXXXXXXX  →  XXXXXXXXXX
+ *   91XXXXXXXXXX   →  XXXXXXXXXX
+ *   XXXXXXXXXX     →  XXXXXXXXXX  (unchanged)
+ *   0XXXXXXXXXX    →  XXXXXXXXXX
  */
 export const normPhone = (p) => {
   if (!p) return null;
@@ -24,21 +34,26 @@ export const normPhone = (p) => {
 const MOBILE_BATCH = 1000;
 
 /**
- * Normalize a date/datetime string for MSSQL CAST AS DATETIME.
- * SQL Server rejects the ISO 8601 'T' separator and requires explicit seconds.
- * '2024-12-01T10:00'    → '2024-12-01 10:00:00'
- * '2024-12-01T10:00:30' → '2024-12-01 10:00:30'
- * '2024-12-01'          → '2024-12-01 00:00:00'
+ * Convert an IST date/datetime string to a UTC string for MSSQL.
+ *
+ * Why: PostgreSQL timestamps are IST. MSSQL stores createdOn in UTC.
+ * Querying MSSQL with IST boundaries causes a 5:30-hour shift — orders
+ * created between 00:00–05:30 IST are completely missed for today.
+ *
+ * Examples (IST → UTC):
+ *   '2026-04-06'          → '2026-04-05 18:30:00'
+ *   '2026-04-06T10:00'    → '2026-04-06 04:30:00'
+ *   '2026-04-07'          → '2026-04-06 18:30:00'
  */
-const toMSSQLDt = (s) => {
+const istToMSSQLUtc = (s) => {
   if (!s) return s;
-  // Replace T separator with space
-  let dt = String(s).replace('T', ' ');
-  // If only date (no time part), append midnight
-  if (dt.length === 10) dt += ' 00:00:00';
-  // If HH:mm only (no seconds), append :00
-  else if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(dt)) dt += ':00';
-  return dt;
+  // Normalise: replace T separator, ensure seconds present
+  let normalized = String(s).replace('T', ' ').trim();
+  if (normalized.length === 10)                               normalized += ' 00:00:00';
+  else if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(normalized)) normalized += ':00';
+
+  // Parse as IST, output as UTC in MSSQL-compatible format
+  return dayjs.tz(normalized, 'Asia/Kolkata').utc().format('YYYY-MM-DD HH:mm:ss');
 };
 
 // ── PostgreSQL: calls + transfer_to_sales count + phone list per campaign ─────
@@ -140,8 +155,8 @@ export const msGetOrdersByMobiles = async ({ startDate, endDate, mobiles }) => {
     // Embed as string literals — normPhone guarantees digits-only, so no injection risk
     const ph = batch.map((m) => `'${m}'`).join(',');
 
-    const dtStart = toMSSQLDt(startDate);
-    const dtEnd   = toMSSQLDt(endDate);
+    const dtStart = istToMSSQLUtc(startDate);
+    const dtEnd   = istToMSSQLUtc(endDate);
 
     const rows = await getMSSQLSequelize().query(
       `SELECT

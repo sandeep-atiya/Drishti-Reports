@@ -68,7 +68,16 @@ const SalesConversionFilters = ({ onFetch, loading }) => {
 
   const pick = (p) => {
     setActiveId(p.id);
-    if (p.get) { const { start, end } = p.get(); setStartDate(start); setEndDate(end); setOpen(false); }
+    if (p.get) {
+      const { start, end } = p.get();
+      setStartDate(start);
+      setEndDate(end);
+      setOpen(false);
+    } else {
+      const t = todayStr();
+      setStartDate(t);
+      setEndDate(t);
+    }
   };
 
   const handleSubmit = (e) => {
@@ -121,7 +130,7 @@ const SalesConversionFilters = ({ onFetch, loading }) => {
               {isCustomDate && (
                 <div className="mx-3 my-2 p-3 bg-slate-50 border border-slate-100 space-y-2.5">
                   {[
-                    ['From', startDate, setStartDate, null, endDate || todayStr()],
+                    ['From', startDate, setStartDate, null, todayStr()],
                     ['To', endDate ? addDays(endDate, -1) : '', (v) => setEndDate(addDays(v, 1)), startDate, todayStr()],
                   ].map(([lbl, val, setter, min, max]) => (
                     <div key={lbl}>
