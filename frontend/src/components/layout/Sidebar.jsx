@@ -10,6 +10,7 @@ const NAV = [
       { id: 'date-wise',            label: 'Date Wise Report',     icon: CalendarDays    },
       { id: 'date-wise-campaign',   label: 'Date Wise Campaign',   icon: Layers          },
       { id: 'sales-conversion',     label: 'Sales Conversion',     icon: Users           },
+      { id: 'sales-hyderabad',      label: 'Sales Hyderabad',      icon: Users           },
     ],
   },
 ];

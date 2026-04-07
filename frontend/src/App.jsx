@@ -6,6 +6,7 @@ import SelfHangupPage           from './features/selfHangup/pages/SelfHangupPage
 import DateWisePage             from './features/dateWise/pages/DateWisePage';
 import DateWiseCampaignPage    from './features/dateWiseCampaign/pages/DateWiseCampaignPage';
 import SalesConversionPage     from './features/salesConversion/pages/SalesConversionPage';
+import SalesHydrabadPage      from './features/salesHyderabad/pages/SalesHydrabadPage';
 
 function App() {
   const [activePage,  setActivePage]  = useState('drishti-report');
@@ -62,6 +63,9 @@ function App() {
         )}
         {activePage === 'sales-conversion' && (
           <SalesConversionPage onMenuToggle={() => setMobileOpen((o) => !o)} />
+        )}
+        {activePage === 'sales-hyderabad' && (
+          <SalesHydrabadPage onMenuToggle={() => setMobileOpen((o) => !o)} />
         )}
       </main>
 
