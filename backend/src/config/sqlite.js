@@ -10,6 +10,12 @@ const DB_PATH    = path.join(DATA_DIR, 'reports_cache.db');
 
 let db = null;
 
+// Increment this whenever a query change means the cached call counts are no
+// longer accurate (e.g. switching COUNT(*) → COUNT(DISTINCT ch_call_id)).
+// On mismatch the calls_daily table is wiped so the next sync re-builds it
+// from scratch with the correct formula.
+const CALLS_SCHEMA_VERSION = '2';  // bumped: COUNT(*) → COUNT(DISTINCT ch_call_id)
+
 const initSchema = (db) => {
   db.exec(`
     -- Pre-aggregated calls per agent per day (from PostgreSQL)
@@ -79,6 +85,20 @@ export const getSQLite = () => {
     db.pragma('cache_size   = -65536'); // 64 MB in-memory page cache
     db.pragma('temp_store   = MEMORY');
     initSchema(db);
+    // ── Schema version guard ───────────────────────────────────────────────
+    // If the stored version doesn't match CALLS_SCHEMA_VERSION, the calls_daily
+    // cache was built with an old (incorrect) formula.  Wipe it so the sync job
+    // re-populates it with the correct COUNT(DISTINCT ch_call_id) values.
+    const storedVer = db
+      .prepare("SELECT value FROM sync_meta WHERE key = 'calls_schema_version'")
+      .get();
+    if (!storedVer || storedVer.value !== CALLS_SCHEMA_VERSION) {
+      logger.warn('[SQLite] calls_schema_version mismatch — clearing calls_daily for full re-sync');
+      db.prepare('DELETE FROM calls_daily').run();
+      db.prepare("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('calls_schema_version', ?)")
+        .run(CALLS_SCHEMA_VERSION);
+    }
+
     logger.info('[SQLite] Ready at ' + DB_PATH);
   }
   return db;

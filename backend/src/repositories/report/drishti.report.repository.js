@@ -72,11 +72,12 @@ const pgGetCallsByAgent = ({ startDate, endDate }) =>
        udh_user_id,
        username,
        campaign_name,
-       ch_campaign_id AS campaign_id,
-       COUNT(*)       AS calls
+       ch_campaign_id                  AS campaign_id,
+       COUNT(DISTINCT ch_call_id)::int AS calls
      FROM acd_interval_denormalized_entity
      WHERE
-       ch_system_disposition = 'CONNECTED'
+       rec_no = 1
+       AND ch_system_disposition = 'CONNECTED'
        AND campaign_name IN (${CAMPAIGN_NAMES_SQL})
        AND ch_hangup_details NOT IN ('Customer_Hangup_Phone', 'Customer_hangup_ui')
        AND udh_disposition_code IS DISTINCT FROM 'Call_Drop'
