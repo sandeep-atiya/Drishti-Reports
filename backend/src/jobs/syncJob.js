@@ -119,6 +119,8 @@ const buildCallsQuery = (fromStr, toStr) => `
         ORDER BY
           COALESCE(udh_talk_time, 0) DESC,
           (ch_system_disposition = 'CONNECTED')::int DESC,
+          (rec_no = 1)::int DESC,
+          (first_queue_answered = 't')::int DESC,
           ch_call_end_time DESC NULLS LAST
       ) AS rn
     FROM acd_interval_denormalized_entity
@@ -370,23 +372,21 @@ const syncTransferCalls = async (db, syncFrom) => {
     SELECT
       ch_date_added::date   AS summary_date,
       ${TRANSFER_CASE_SQL}  AS campaign_name,
-      COUNT(*)::int         AS calls,
-      COUNT(*) FILTER (WHERE udh_disposition_code = 'Transfer_to_sales')::int AS transfer_to_sales,
+      COUNT(DISTINCT ch_call_id)::int AS calls,
+      COUNT(DISTINCT ch_call_id) FILTER (WHERE udh_disposition_code IN ('Transfer to Sales', 'Transfer_to_sales'))::int AS transfer_to_sales,
       ARRAY_REMOVE(
-        ARRAY_AGG(ch_phone) FILTER (WHERE udh_disposition_code = 'Transfer_to_sales'),
+        ARRAY_AGG(ch_phone) FILTER (WHERE udh_disposition_code IN ('Transfer to Sales', 'Transfer_to_sales')),
         NULL
       ) AS transfer_phones
     FROM acd_interval_denormalized_entity
     WHERE
-      ch_system_disposition = 'CONNECTED'
+        ch_system_disposition = 'CONNECTED'
+        AND rec_no = 1
+        AND first_queue_answered = 't'
       AND (
         campaign_name IN (${TRANSFER_DIRECT_SQL})
         OR (campaign_name = 'Unayur_IN' AND queue_name IN ('FreshAgentQueue', 'Verification_PendingAgentQueue'))
       )
-      AND (ch_hangup_details IS NULL
-           OR ch_hangup_details NOT IN ('Customer_Hangup_Phone', 'Customer_hangup_ui'))
-      AND udh_disposition_code IS DISTINCT FROM 'Call_Drop'
-      AND uch_talk_time > 5
       ${fromStr ? `AND ch_date_added >= '${fromStr}'::date` : ''}
       ${toStr   ? `AND ch_date_added <  '${toStr}'::date`  : ''}
     GROUP BY ch_date_added::date, ${TRANSFER_CASE_SQL}`;

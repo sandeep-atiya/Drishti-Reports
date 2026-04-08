@@ -50,9 +50,16 @@ const transferReportService = {
     const isDateOnly = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s);
     const useSQLite  = isDateOnly(startDate) && isDateOnly(endDate);
 
-    const pgRows = useSQLite
+    let pgRows = useSQLite
       ? sqliteGetTransferData({ startDate, endDate })
       : await pgGetTransferData({ startDate, endDate });
+
+    // If SQLite returned nothing (e.g. cache was just wiped and sync hasn't
+    // completed yet), fall back to a direct PG query so the report still works.
+    if (useSQLite && pgRows.length === 0) {
+      logger.warn('[TransferSvc] SQLite returned no rows — falling back to direct PG query');
+      pgRows = await pgGetTransferData({ startDate, endDate });
+    }
 
     logger.info(`[TransferSvc] ${useSQLite ? 'SQLite' : 'PG'} done: ${pgRows.length} campaign rows (${Date.now() - t0}ms)`);
 

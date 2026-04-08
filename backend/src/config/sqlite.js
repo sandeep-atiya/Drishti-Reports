@@ -14,7 +14,8 @@ let db = null;
 // longer accurate (e.g. switching COUNT(*) → COUNT(DISTINCT ch_call_id)).
 // On mismatch the calls_daily table is wiped so the next sync re-builds it
 // from scratch with the correct formula.
-const CALLS_SCHEMA_VERSION = '2';  // bumped: COUNT(*) → COUNT(DISTINCT ch_call_id)
+const CALLS_SCHEMA_VERSION    = '2';  // bumped: COUNT(*) → COUNT(DISTINCT ch_call_id)
+const TRANSFER_SCHEMA_VERSION = '3';  // bumped: removed hangup/call_drop/talk_time filters
 
 const initSchema = (db) => {
   db.exec(`
@@ -97,6 +98,16 @@ export const getSQLite = () => {
       db.prepare('DELETE FROM calls_daily').run();
       db.prepare("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('calls_schema_version', ?)")
         .run(CALLS_SCHEMA_VERSION);
+    }
+
+    const storedTransferVer = db
+      .prepare("SELECT value FROM sync_meta WHERE key = 'transfer_schema_version'")
+      .get();
+    if (!storedTransferVer || storedTransferVer.value !== TRANSFER_SCHEMA_VERSION) {
+      logger.warn('[SQLite] transfer_schema_version mismatch — clearing transfer_daily for full re-sync');
+      db.prepare('DELETE FROM transfer_daily').run();
+      db.prepare("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('transfer_schema_version', ?)")
+        .run(TRANSFER_SCHEMA_VERSION);
     }
 
     logger.info('[SQLite] Ready at ' + DB_PATH);
