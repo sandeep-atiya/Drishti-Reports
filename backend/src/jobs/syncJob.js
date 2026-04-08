@@ -105,27 +105,45 @@ const _upsertOrderRows = (db, rows) => {
 
 // ── Pull calls from PostgreSQL (chunked to handle large date ranges) ──────────
 
+const buildCallsQuery = (fromStr, toStr) => `
+  WITH best AS (
+    SELECT
+      ch_date_added::date                AS summary_date,
+      ch_call_id,
+      COALESCE(udh_user_id, '')          AS udh_user_id,
+      username,
+      campaign_name,
+      ch_campaign_id,
+      ROW_NUMBER() OVER (
+        PARTITION BY ch_call_id
+        ORDER BY
+          COALESCE(udh_talk_time, 0) DESC,
+          (ch_system_disposition = 'CONNECTED')::int DESC,
+          ch_call_end_time DESC NULLS LAST
+      ) AS rn
+    FROM acd_interval_denormalized_entity
+    WHERE
+      campaign_name IN (${CAMPAIGN_NAMES_SQL})
+      ${fromStr ? `AND ch_date_added >= '${fromStr}'::date` : ''}
+      ${toStr   ? `AND ch_date_added <  '${toStr}'::date`   : ''}
+  )
+  SELECT
+    summary_date,
+    udh_user_id,
+    username,
+    campaign_name,
+    ch_campaign_id                     AS campaign_id,
+    COUNT(DISTINCT ch_call_id)::int    AS calls
+  FROM best
+  WHERE rn = 1
+  GROUP BY summary_date, udh_user_id, username, campaign_name, ch_campaign_id`;
+
 const syncCalls = async (db, syncFrom) => {
   // syncFrom = null means the table is empty → pull everything with no date filter
   if (!syncFrom) {
     logger.info('[SyncJob] PG calls — FULL (first ever sync)');
     const rows = await getPGSequelize().query(
-      `SELECT
-         ch_date_added::date                AS summary_date,
-         COALESCE(udh_user_id, '')          AS udh_user_id,
-         username,
-         campaign_name,
-         ch_campaign_id                     AS campaign_id,
-         COUNT(DISTINCT ch_call_id)::int    AS calls
-       FROM acd_interval_denormalized_entity
-       WHERE
-         rec_no = 1
-         AND ch_system_disposition = 'CONNECTED'
-         AND campaign_name IN (${CAMPAIGN_NAMES_SQL})
-         AND ch_hangup_details NOT IN ('Customer_Hangup_Phone', 'Customer_hangup_ui')
-         AND udh_disposition_code IS DISTINCT FROM 'Call_Drop'
-         AND uch_talk_time > 5
-       GROUP BY ch_date_added::date, udh_user_id, username, campaign_name, ch_campaign_id`,
+      buildCallsQuery(null, null),
       { type: QueryTypes.SELECT }
     );
     logger.info(`[SyncJob] PG calls — full: ${rows.length} rows`);
@@ -149,26 +167,8 @@ const syncCalls = async (db, syncFrom) => {
     const toStr    = isLast ? null : chunkEnd.format('YYYY-MM-DD');
     chunk++;
 
-    const toFilter   = toStr ? `AND ch_date_added <  '${toStr}'::date` : '';
     const rows = await getPGSequelize().query(
-      `SELECT
-         ch_date_added::date                AS summary_date,
-         COALESCE(udh_user_id, '')          AS udh_user_id,
-         username,
-         campaign_name,
-         ch_campaign_id                     AS campaign_id,
-         COUNT(DISTINCT ch_call_id)::int    AS calls
-       FROM acd_interval_denormalized_entity
-       WHERE
-         rec_no = 1
-         AND ch_system_disposition = 'CONNECTED'
-         AND campaign_name IN (${CAMPAIGN_NAMES_SQL})
-         AND ch_hangup_details NOT IN ('Customer_Hangup_Phone', 'Customer_hangup_ui')
-         AND udh_disposition_code IS DISTINCT FROM 'Call_Drop'
-         AND uch_talk_time > 5
-         AND ch_date_added >= '${fromStr}'::date
-         ${toFilter}
-       GROUP BY ch_date_added::date, udh_user_id, username, campaign_name, ch_campaign_id`,
+      buildCallsQuery(fromStr, toStr),
       { type: QueryTypes.SELECT }
     );
 
@@ -188,27 +188,25 @@ const syncCalls = async (db, syncFrom) => {
 // Convert an IST date string (YYYY-MM-DD) to its UTC equivalent for MSSQL.
 // IST = UTC+5:30, so IST midnight = UTC 18:30 of the previous day.
 // e.g. '2026-04-06' IST 00:00 → '2026-04-05 18:30:00' UTC
-const istDateToUtcStr = (yyyymmdd) =>
-  dayjs.utc(yyyymmdd).subtract(330, 'minute').format('YYYY-MM-DD HH:mm:ss');
-
 const syncOrders = async (db, syncFrom) => {
-  // IST-aware date expression: adds 5h30m to UTC createdOn before bucketing to date.
-  // This ensures an order at 03:00 IST (= 21:30 UTC previous day) is counted on
-  // the correct IST date, not the UTC date.
-  const IST_DATE = `CAST(DATEADD(MINUTE, 330, createdOn) AS DATE)`;
+  // Use UTC date directly for summary_date — matches the reference query
+  // (Book3: @fromDate='2026-04-06 00:00:00', @toDate='2026-04-07 00:00:00').
+  // tblOrderDetails.createdOn is in UTC; bucket by UTC date so SQLite
+  // summary_date aligns with the frontend date filter.
+  const UTC_DATE = `CAST(createdOn AS DATE)`;
 
   if (!syncFrom) {
     logger.info('[SyncJob] MSSQL orders — FULL (first ever sync)');
     const rows = await getMSSQLSequelize().query(
       `SELECT
-         ${IST_DATE}                                                                    AS summary_date,
+         ${UTC_DATE}                                                                    AS summary_date,
          campaign_Id,
          AgentID,
          COUNT(*) AS orders,
          SUM(CASE WHEN disposition_Code = 'Verified' THEN 1    ELSE 0    END)          AS verified,
          SUM(CASE WHEN disposition_Code = 'Verified' THEN ISNULL(total_amount,0) ELSE 0 END) AS verified_amount
        FROM tblOrderDetails
-       GROUP BY ${IST_DATE}, campaign_Id, AgentID`,
+       GROUP BY ${UTC_DATE}, campaign_Id, AgentID`,
       { type: QueryTypes.SELECT }
     );
     logger.info(`[SyncJob] MSSQL orders — full: ${rows.length} rows`);
@@ -228,25 +226,22 @@ const syncOrders = async (db, syncFrom) => {
     const toStr    = isLast ? null : chunkEnd.format('YYYY-MM-DD');
     chunk++;
 
-    // Convert IST chunk boundaries to UTC for the WHERE clause.
-    // e.g. fromStr='2026-04-05' IST → WHERE createdOn >= '2026-04-04 18:30:00' UTC
-    const utcFrom   = istDateToUtcStr(fromStr);
-    const toFilter  = toStr
-      ? `AND createdOn < CAST('${istDateToUtcStr(toStr)}' AS DATETIME)`
-      : '';
+    // UTC midnight boundaries — same logic as the reference Book3 query
+    const fromDt  = `${fromStr} 00:00:00`;
+    const toFilter = toStr ? `AND createdOn < CAST('${toStr} 00:00:00' AS DATETIME)` : '';
 
     const rows = await getMSSQLSequelize().query(
       `SELECT
-         ${IST_DATE}                                                                    AS summary_date,
+         ${UTC_DATE}                                                                    AS summary_date,
          campaign_Id,
          AgentID,
          COUNT(*) AS orders,
          SUM(CASE WHEN disposition_Code = 'Verified' THEN 1    ELSE 0    END)          AS verified,
          SUM(CASE WHEN disposition_Code = 'Verified' THEN ISNULL(total_amount,0) ELSE 0 END) AS verified_amount
        FROM tblOrderDetails
-       WHERE createdOn >= CAST('${utcFrom}' AS DATETIME)
+       WHERE createdOn >= CAST('${fromDt}' AS DATETIME)
          ${toFilter}
-       GROUP BY ${IST_DATE}, campaign_Id, AgentID`,
+       GROUP BY ${UTC_DATE}, campaign_Id, AgentID`,
       { type: QueryTypes.SELECT }
     );
 
