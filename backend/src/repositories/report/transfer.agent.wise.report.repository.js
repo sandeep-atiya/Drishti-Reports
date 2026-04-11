@@ -29,26 +29,100 @@ const PROCESS_FILTER_SQL = `
 // excluding short CALL_DROP rows (< 5s), keeping NULL-talk-time customer-hangup
 // call-drops (they appear in the manual sheet).
 
+// export const pgGetTransferAgentWiseData = ({ startDate, endDate }) =>
+//   getPGSequelize().query(
+//     `SELECT
+//        DATE(ch_date_added)                         AS report_date,
+//        campaign_name,
+//        COALESCE(udh_user_id, username)             AS agent_name,
+
+//        -- Calls (mirrors Transfer Unique Calls logic)
+//        (
+//          COUNT(ch_phone) FILTER (
+//            WHERE ch_system_disposition = 'CONNECTED'
+//              AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
+//          )
+//          - COUNT(ch_phone) FILTER (
+//            WHERE ch_system_disposition = 'CONNECTED'
+//              AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
+//              AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'CALL DROP')
+//              AND COALESCE(udh_talk_time, 0) < 5000
+//          )
+//          + COUNT(ch_phone) FILTER (
+//            WHERE ch_system_disposition = 'CONNECTED'
+//              AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
+//              AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'CALL DROP')
+//              AND uch_talk_time IS NULL
+//              AND UPPER(COALESCE(ch_hangup_details, '')) IN ('CUSTOMER_HANGUP_PHONE', 'CUSTOMER_HANGUP_UI')
+//          )
+//        )::int AS calls,
+
+//        -- Transfers to sales per agent
+//        COUNT(DISTINCT ch_call_id) FILTER (
+//          WHERE udh_disposition_code IN ('Transfer to Sales', 'Transfer_to_sales')
+//        )::int AS transfer_to_sales,
+
+//        -- Phones transferred by this agent with their transfer timestamps
+//        JSON_AGG(
+//          JSON_BUILD_OBJECT(
+//            'phone', ch_phone,
+//            'timestamp', ch_date_added
+//          )
+//        ) FILTER (
+//          WHERE udh_disposition_code IN ('Transfer to Sales', 'Transfer_to_sales')
+//            AND ch_phone IS NOT NULL
+//            AND BTRIM(ch_phone) != ''
+//        ) AS transfer_phone_details
+
+//      FROM acd_interval_denormalized_entity
+
+//      WHERE
+//         rec_no = 1
+//         AND first_queue_answered = 't'
+
+//         AND ${PROCESS_FILTER_SQL}
+
+//         AND ch_date_added >= :startDate::timestamp
+//         AND ch_date_added <  :endDate::timestamp
+
+//      GROUP BY
+//        DATE(ch_date_added),
+//        campaign_name,
+//        COALESCE(udh_user_id, username)
+
+//      ORDER BY
+//        campaign_name    ASC,
+//        report_date      ASC,
+//        transfer_to_sales DESC,
+//        agent_name       ASC`,
+//     {
+//       replacements: { startDate, endDate },
+//       type: QueryTypes.SELECT,
+//     },
+//   );
+
 export const pgGetTransferAgentWiseData = ({ startDate, endDate }) =>
   getPGSequelize().query(
     `SELECT
-       DATE(ch_date_added)                         AS report_date,
+       DATE(ch_date_added) AS report_date,
        campaign_name,
-       COALESCE(udh_user_id, username)             AS agent_name,
+       udh_user_id AS agent_name,
 
-       -- Calls (mirrors Transfer Unique Calls logic)
+       -- Calls (fixed with DISTINCT)
        (
-         COUNT(ch_phone) FILTER (
+         COUNT(DISTINCT ch_call_id) FILTER (
            WHERE ch_system_disposition = 'CONNECTED'
              AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
          )
-         - COUNT(ch_phone) FILTER (
+
+         - COUNT(DISTINCT ch_call_id) FILTER (
            WHERE ch_system_disposition = 'CONNECTED'
              AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
              AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'CALL DROP')
              AND COALESCE(udh_talk_time, 0) < 5000
          )
-         + COUNT(ch_phone) FILTER (
+
+         + COUNT(DISTINCT ch_call_id) FILTER (
            WHERE ch_system_disposition = 'CONNECTED'
              AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
              AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'CALL DROP')
@@ -57,18 +131,16 @@ export const pgGetTransferAgentWiseData = ({ startDate, endDate }) =>
          )
        )::int AS calls,
 
-       -- Transfers to sales per agent
+       -- Transfers to sales
        COUNT(DISTINCT ch_call_id) FILTER (
          WHERE udh_disposition_code IN ('Transfer to Sales', 'Transfer_to_sales')
        )::int AS transfer_to_sales,
 
-       -- Phones transferred by this agent with their transfer timestamps
-       JSON_AGG(
-         JSON_BUILD_OBJECT(
-           'phone', ch_phone,
-           'timestamp', ch_date_added
-         )
-       ) FILTER (
+       -- Transfer phone details (JSONB FIX)
+       JSONB_AGG(DISTINCT JSONB_BUILD_OBJECT(
+         'phone', ch_phone,
+         'timestamp', ch_date_added
+       )) FILTER (
          WHERE udh_disposition_code IN ('Transfer to Sales', 'Transfer_to_sales')
            AND ch_phone IS NOT NULL
            AND BTRIM(ch_phone) != ''
@@ -80,6 +152,10 @@ export const pgGetTransferAgentWiseData = ({ startDate, endDate }) =>
         rec_no = 1
         AND first_queue_answered = 't'
 
+        -- ✅ Only udh_user_id (no username fallback)
+        AND udh_user_id IS NOT NULL
+        AND BTRIM(udh_user_id) <> ''
+
         AND ${PROCESS_FILTER_SQL}
 
         AND ch_date_added >= :startDate::timestamp
@@ -88,13 +164,13 @@ export const pgGetTransferAgentWiseData = ({ startDate, endDate }) =>
      GROUP BY
        DATE(ch_date_added),
        campaign_name,
-       COALESCE(udh_user_id, username)
+       udh_user_id
 
      ORDER BY
-       campaign_name    ASC,
-       report_date      ASC,
+       campaign_name ASC,
+       report_date ASC,
        transfer_to_sales DESC,
-       agent_name       ASC`,
+       agent_name ASC`,
     {
       replacements: { startDate, endDate },
       type: QueryTypes.SELECT,
@@ -117,14 +193,14 @@ export const msGetOrdersByMobilesAgentWise = async ({
     return d.length === 10 ? `${d} 00:00:00` : d;
   };
   const dtStart = toMSSQLDate(startDate);
-  const dtEnd   = toMSSQLDate(endDate);
+  const dtEnd = toMSSQLDate(endDate);
 
   // Deduplicate across batches by order id
   const rowsById = new Map();
 
   for (let i = 0; i < normSet.length; i += MOBILE_BATCH) {
     const batch = normSet.slice(i, i + MOBILE_BATCH);
-    const ph    = batch.map((m) => `'${m}'`).join(",");
+    const ph = batch.map((m) => `'${m}'`).join(",");
 
     const rows = await getMSSQLSequelize().query(
       `SELECT

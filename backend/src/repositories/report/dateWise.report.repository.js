@@ -45,17 +45,17 @@ export const pgGetCallsByAgentDate = ({ startDate, endDate }) => {
   return getPGSequelize().query(
     `SELECT
        TO_CHAR(ch_date_added::date, 'YYYY-MM-DD')  AS call_date,
-       COALESCE(udh_user_id, username)              AS agent_id,
+       udh_user_id                                  AS agent_id,
        username                                     AS agent_name,
        COUNT(DISTINCT ch_call_id)::int              AS calls
      FROM acd_interval_denormalized_entity
      WHERE ${startExpr}
        AND ${endExpr}
-       AND COALESCE(udh_user_id, username) IS NOT NULL
-       AND COALESCE(udh_user_id, username) <> ''
+       AND udh_user_id IS NOT NULL
+       AND udh_user_id <> ''
      GROUP BY
        TO_CHAR(ch_date_added::date, 'YYYY-MM-DD'),
-       COALESCE(udh_user_id, username),
+       udh_user_id,
        username
      ORDER BY username, TO_CHAR(ch_date_added::date, 'YYYY-MM-DD')`,
     {

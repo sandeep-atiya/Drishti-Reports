@@ -60,7 +60,7 @@ export const pgGetCallsByAgentCampaign = ({ startDate, endDate }) => {
 
   return getPGSequelize().query(
     `SELECT
-       COALESCE(udh_user_id, username)              AS agent_id,
+       udh_user_id                                  AS agent_id,
        username                                     AS agent_name,
        campaign_name,
        ch_campaign_id,
@@ -73,13 +73,13 @@ export const pgGetCallsByAgentCampaign = ({ startDate, endDate }) => {
              campaign_name ILIKE 'Unayur_IN'
          AND queue_name IN ('Verification_PendingAgentQueue', 'FreshAgentQueue')
        )
-       AND COALESCE(udh_user_id, username) IS NOT NULL
-       AND COALESCE(udh_user_id, username) <> ''
+       AND udh_user_id IS NOT NULL
+       AND udh_user_id <> ''
        AND uch_talk_time > 5
        AND (ch_hangup_details IS NULL OR ch_hangup_details NOT IN ('Customer_Hangup_Phone', 'Customer_hangup_ui'))
        AND udh_disposition_code IS DISTINCT FROM 'CALL_DROP'
      GROUP BY
-       COALESCE(udh_user_id, username),
+       udh_user_id,
        username,
        campaign_name,
        ch_campaign_id

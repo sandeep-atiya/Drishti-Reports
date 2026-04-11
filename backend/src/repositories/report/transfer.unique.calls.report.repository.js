@@ -36,7 +36,7 @@ const PROCESS_FILTER_SQL = `
 //        campaign_name AS process_name,
 
 //        -- Agents (only meaningful for connected calls)
-//        COUNT(DISTINCT COALESCE(udh_user_id, username)) FILTER (
+//        COUNT(DISTINCT udh_user_id) FILTER (
 //          WHERE ch_system_disposition = 'CONNECTED'
 //        )::int AS p_count,
 
@@ -92,7 +92,7 @@ const PROCESS_FILTER_SQL = `
 //        campaign_name AS process_name,
 
 //        -- Agents (only meaningful for connected calls)
-//        COUNT(DISTINCT COALESCE(udh_user_id, username)) FILTER (
+//        COUNT(DISTINCT udh_user_id) FILTER (
 //          WHERE ch_system_disposition = 'CONNECTED'
 //        )::int AS p_count,
 
@@ -149,7 +149,7 @@ const PROCESS_FILTER_SQL = `
 //        campaign_name AS process_name,
 
 //        -- Agents (only meaningful for connected calls)
-//        COUNT(DISTINCT COALESCE(udh_user_id, username)) FILTER (
+//        COUNT(DISTINCT udh_user_id) FILTER (
 //          WHERE ch_system_disposition = 'CONNECTED'
 //        )::int AS p_count,
 
@@ -210,7 +210,7 @@ export const pgGetTransferUniqueCallsData = ({ startDate, endDate }) =>
        campaign_name AS process_name,
 
        -- Agents (only meaningful for connected calls)
-       COUNT(DISTINCT COALESCE(udh_user_id, username)) FILTER (
+       COUNT(DISTINCT udh_user_id) FILTER (
          WHERE ch_system_disposition = 'CONNECTED'
        )::int AS p_count,
 
