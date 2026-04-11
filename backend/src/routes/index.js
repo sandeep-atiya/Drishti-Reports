@@ -7,6 +7,7 @@ import dateWiseCampaignReportRoutes from './dateWiseCampaign.report.routes.js';
 import salesConversionReportRoutes  from './salesConversion.report.routes.js';
 import salesHydrabadReportRoutes          from './salesHyderabad.report.routes.js';
 import transferUniqueCallsReportRoutes    from './transfer.unique.calls.report.routes.js';
+import transferAgentWiseReportRoutes      from './transfer.agent.wise.report.routes.js';
 
 const router = Router();
 
@@ -27,5 +28,6 @@ router.use('/reports/datewise-campaign', dateWiseCampaignReportRoutes);
 router.use('/reports/sales-conversion',  salesConversionReportRoutes);
 router.use('/reports/sales-hyderabad',        salesHydrabadReportRoutes);
 router.use('/reports/transfer-unique-calls',  transferUniqueCallsReportRoutes);
+router.use('/reports/transfer-agent-wise',    transferAgentWiseReportRoutes);
 
 export default router;

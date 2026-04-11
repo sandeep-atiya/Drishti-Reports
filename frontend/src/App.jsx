@@ -8,6 +8,7 @@ import DateWiseCampaignPage    from './features/dateWiseCampaign/pages/DateWiseC
 import SalesConversionPage     from './features/salesConversion/pages/SalesConversionPage';
 import SalesHydrabadPage                   from './features/salesHyderabad/pages/SalesHydrabadPage';
 import TransferConversionUniqueCallsPage   from './features/transferConversionUniqueCalls/pages/TransferConversionUniqueCallsPage';
+import TransferAgentWisePage               from './features/transferAgentWise/pages/TransferAgentWisePage';
 
 function App() {
   const [activePage,  setActivePage]  = useState('drishti-report');
@@ -70,6 +71,9 @@ function App() {
         )}
         {activePage === 'transfer-conversion-unique-calls' && (
           <TransferConversionUniqueCallsPage onMenuToggle={() => setMobileOpen((o) => !o)} />
+        )}
+        {activePage === 'transfer-agent-wise' && (
+          <TransferAgentWisePage onMenuToggle={() => setMobileOpen((o) => !o)} />
         )}
       </main>
 

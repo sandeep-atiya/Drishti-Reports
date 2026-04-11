@@ -7,6 +7,7 @@ const NAV = [
       { id: 'drishti-report',       label: 'Drishti Report',       icon: TrendingUp      },
       { id: 'transfer-conversion',              label: 'Transfer Conversion',              icon: ArrowRightLeft  },
       { id: 'transfer-conversion-unique-calls', label: 'Transfer Conversion Unique Calls', icon: ArrowRightLeft  },
+      { id: 'transfer-agent-wise',             label: 'Agent Wise Transfer Conversion',  icon: Users           },
       { id: 'self-hangup',          label: 'Self Hangup',          icon: PhoneOff        },
       { id: 'date-wise',            label: 'Date Wise Report',     icon: CalendarDays    },
       { id: 'date-wise-campaign',   label: 'Date Wise Campaign',   icon: Layers          },
