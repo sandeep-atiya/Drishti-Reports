@@ -150,7 +150,7 @@ const ReportsPage = ({ onMenuToggle }) => {
 
           {data && (
             <button
-              onClick={() => exportToExcel({ columns: data.columns, campaignReport: data.campaignReport, agentReport: data.agentReport, startDate: data.startDate, endDate: data.endDate })}
+              onClick={() => exportToExcel({ columns: data.columns, campaignReport: data.campaignReport, startDate: data.startDate, endDate: data.endDate })}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 active:scale-[0.97] transition-all shadow-sm shadow-emerald-200 shrink-0"
             >
               <FileSpreadsheet size={15} />

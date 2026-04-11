@@ -37,19 +37,45 @@ const drishtiReportService = {
     const pgAgentRows = await drishtiReportRepository.getCallsByAgent({ startDate, endDate });
     logger.info(`[PERF] Calls query done in ${Date.now() - t0}ms  (${pgAgentRows.length} rows)`);
 
-    // ── Step 2: derive campaign-level call totals from agent rows (no extra DB hit) ──
-    const pgCampaignMap = {};
-    for (const r of pgAgentRows) {
-      const key = String(r.campaign_id);
-      if (!pgCampaignMap[key]) {
-        pgCampaignMap[key] = { campaign_name: r.campaign_name, campaign_id: r.campaign_id, calls: 0 };
-      }
-      pgCampaignMap[key].calls += Number(r.calls) || 0;
-    }
-    const pgCampaignRows = Object.values(pgCampaignMap);
+    // ── Step 2: derive campaign-level call totals — merged by campaign_name ──────
+    //
+    // A campaign may have more than one ch_campaign_id in PG (e.g. old vs. new ID,
+    // or inconsistent values in duplicate rows).  Grouping first by campaign_id and
+    // then merging by campaign_name ensures:
+    //   • The campaign table shows ONE row per campaign name (no duplicates).
+    //   • All campaign_ids for the same name are forwarded to MSSQL so no orders
+    //     are lost.
+    //   • Only campaign_ids that actually appear under the expected campaign names
+    //     are forwarded — i.e. we never send IDs that belong to other campaigns.
 
-    // unique campaign IDs for MSSQL filter
-    const campaignIds = pgCampaignRows.map((r) => r.campaign_id).filter(Boolean);
+    // Pass 1 — group by campaign_id (deduplicate PG rows)
+    const byId = new Map();
+    for (const r of pgAgentRows) {
+      const key = String(r.campaign_id ?? '');
+      if (!byId.has(key)) {
+        byId.set(key, { campaign_name: (r.campaign_name || '').trim(), campaign_id: r.campaign_id, calls: 0 });
+      }
+      byId.get(key).calls += Number(r.calls) || 0;
+    }
+
+    // Pass 2 — merge by campaign_name so each campaign appears only once
+    const byName = new Map();
+    for (const row of byId.values()) {
+      const name = row.campaign_name;
+      if (!byName.has(name)) {
+        byName.set(name, { campaign_name: name, campaignIds: new Set(), calls: 0 });
+      }
+      const entry = byName.get(name);
+      entry.calls += row.calls;
+      if (row.campaign_id != null && row.campaign_id !== '') {
+        entry.campaignIds.add(String(row.campaign_id));
+      }
+    }
+
+    // Flat list of all unique, non-null campaign IDs for the MSSQL filter
+    const campaignIds = [...new Set(
+      [...byName.values()].flatMap((c) => [...c.campaignIds])
+    )].filter(Boolean);
 
     // ── Step 3: orders queries in parallel (SQLite when ready, MSSQL fallback) ──
     const t1 = Date.now();
@@ -60,21 +86,27 @@ const drishtiReportService = {
     logger.info(`[PERF] Orders queries done in ${Date.now() - t1}ms`);
 
     // ── Step 4: build campaign table ──────────────────────────────────────
-    const campaignOrdersMap = {};
+    // Index MSSQL rows by campaign_Id for fast lookup.
+    const mssqlByCampaignId = new Map();
     for (const row of mssqlCampaignRows) {
-      campaignOrdersMap[String(row.campaign_Id)] = row;
+      mssqlByCampaignId.set(String(row.campaign_Id), row);
     }
 
-    const campaignData = pgCampaignRows.map((r) => {
-      const ord = campaignOrdersMap[String(r.campaign_id)] || {};
+    // Build one row per campaign name, summing orders across all campaign IDs
+    // that belong to that name (handles the multi-ID-per-campaign case).
+    const campaignData = [...byName.values()].map((c) => {
+      let orders = 0, verified = 0, verifiedAmount = 0;
+      for (const cid of c.campaignIds) {
+        const ord = mssqlByCampaignId.get(cid);
+        if (ord) {
+          orders         += Number(ord.orders)          || 0;
+          verified       += Number(ord.verified)        || 0;
+          verifiedAmount += Number(ord.verified_amount) || 0;
+        }
+      }
       return {
-        campaign: r.campaign_name,
-        ...metrics({
-          calls:          r.calls,
-          orders:         ord.orders          || 0,
-          verified:       ord.verified        || 0,
-          verifiedAmount: ord.verified_amount || 0,
-        }),
+        campaign: c.campaign_name,
+        ...metrics({ calls: c.calls, orders, verified, verifiedAmount }),
       };
     });
 

@@ -36,7 +36,7 @@ export const computeTotals = (rows) => {
   };
 };
 
-export const exportToExcel = ({ columns, campaignReport, agentReport, startDate, endDate }) => {
+export const exportToExcel = ({ columns, campaignReport, startDate, endDate }) => {
   const wb = XLSX.utils.book_new();
 
   const toSheet = (rows) => {
@@ -46,7 +46,6 @@ export const exportToExcel = ({ columns, campaignReport, agentReport, startDate,
   };
 
   XLSX.utils.book_append_sheet(wb, toSheet(campaignReport), 'Campaign Report');
-  XLSX.utils.book_append_sheet(wb, toSheet(agentReport),   'Agent Report');
 
   XLSX.writeFile(wb, `Drishti_Report_${startDate}_to_${endDate}.xlsx`);
 };

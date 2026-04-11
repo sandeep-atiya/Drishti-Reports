@@ -1,0 +1,41 @@
+import apiClient from '../../../services/apiClient';
+
+export const fetchTransferUniqueCallsReport = ({ startDate, endDate }) =>
+  apiClient
+    .get('/reports/transfer-unique-calls', {
+      params:  { startDate, endDate },
+      timeout: 15000,   // job-creation returns 202 in <1 s; 15 s is very safe
+    })
+    .then((r) => r.data);
+
+export const fetchTransferUniqueCallsJobStatus = (jobId) =>
+  apiClient
+    .get(`/reports/transfer-unique-calls/jobs/${jobId}`)
+    .then((r) => r.data);
+
+export const pollTransferUniqueCallsJobUntilDone = (jobId, { intervalMs = 3000, onProgress, signal } = {}) =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new DOMException('Polling aborted', 'AbortError'));
+
+    let timer;
+    signal?.addEventListener('abort', () => {
+      clearTimeout(timer);
+      reject(new DOMException('Polling aborted', 'AbortError'));
+    }, { once: true });
+
+    const tick = async () => {
+      if (signal?.aborted) return;
+      try {
+        const result = await fetchTransferUniqueCallsJobStatus(jobId);
+        if (signal?.aborted) return;
+        if (result.status === 'completed') return resolve(result);
+        if (result.status === 'failed')    return reject(new Error(result.message || 'Job failed'));
+        if (onProgress) onProgress(result.status);
+        timer = setTimeout(tick, intervalMs);
+      } catch (err) {
+        if (!signal?.aborted) reject(err);
+      }
+    };
+
+    tick();
+  });
