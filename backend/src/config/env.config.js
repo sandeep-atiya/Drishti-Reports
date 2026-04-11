@@ -31,6 +31,18 @@ const env = {
     min: parseInt(process.env.PG_POOL_MIN, 10) || 0,
     idleTimeoutMillis: parseInt(process.env.PG_POOL_IDLE, 10) || 60000,
   },
+
+  redis: {
+    host: process.env.REDIS_HOST || '127.0.0.1',
+    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+    password: process.env.REDIS_PASSWORD || undefined,
+  },
+
+  // Date range (days) above which the report is processed as a background job
+  LARGE_RANGE_DAYS: parseInt(process.env.LARGE_RANGE_DAYS, 10) || 90,
+
+  // How often to re-sync SQLite from PG + MSSQL (milliseconds)
+  SYNC_INTERVAL_MS: (parseInt(process.env.SYNC_INTERVAL_MINUTES, 10) || 60) * 60 * 1000,
 };
 
 export default env;
