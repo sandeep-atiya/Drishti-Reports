@@ -28,11 +28,10 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        // Split heavy libraries into separate cached chunks
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          xlsx:   ['xlsx'],
-          icons:  ['lucide-react'],
+        manualChunks(id) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) return 'vendor';
+          if (id.includes('node_modules/xlsx'))         return 'xlsx';
+          if (id.includes('node_modules/lucide-react')) return 'icons';
         },
         chunkFileNames:  'assets/[name]-[hash].js',
         entryFileNames:  'assets/[name]-[hash].js',

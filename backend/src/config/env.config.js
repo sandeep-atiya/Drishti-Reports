@@ -43,6 +43,16 @@ const env = {
 
   // How often to re-sync SQLite from PG + MSSQL (milliseconds)
   SYNC_INTERVAL_MS: (parseInt(process.env.SYNC_INTERVAL_MINUTES, 10) || 60) * 60 * 1000,
+
+  jwt: {
+    secret:    process.env.JWT_SECRET    || '',
+    expiresIn: process.env.JWT_EXPIRES_IN || '8h',
+  },
+
+  aes: {
+    key:  process.env.AES_KEY  || '',
+    salt: process.env.AES_SALT || '49,76,61,6e,20,4d,65,64,76,65,64,65,76',
+  },
 };
 
 export default env;

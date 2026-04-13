@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import authRoutes                   from './auth.routes.js';
 import drishtiReportRoutes          from './drishti.report.routes.js';
 import transferReportRoutes         from './transfer.report.routes.js';
 import selfHangupReportRoutes       from './selfHangup.report.routes.js';
@@ -11,6 +12,8 @@ import transferUniqueCallsReportRoutes    from './transfer.unique.calls.report.r
 import transferAgentWiseReportRoutes      from './transfer.agent.wise.report.routes.js';
 
 const router = Router();
+
+router.use('/auth', authRoutes);
 
 router.get('/health', (req, res) => {
   res.status(200).json({

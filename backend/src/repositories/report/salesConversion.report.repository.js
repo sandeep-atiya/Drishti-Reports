@@ -94,6 +94,7 @@ export const pgGetCallsByAgentCampaign = ({ startDate, endDate }) => {
        AND ${CAMPAIGN_ILIKE}
        AND NOT (
              campaign_name ILIKE 'Unayur_IN'
+         AND queue_name IS NOT NULL
          AND queue_name IN ('Verification_PendingAgentQueue', 'FreshAgentQueue')
        )
        AND udh_user_id IS NOT NULL

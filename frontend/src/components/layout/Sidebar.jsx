@@ -1,24 +1,26 @@
-import { BarChart2, TrendingUp, ArrowRightLeft, PhoneOff, CalendarDays, Layers, Users, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import {
+  BarChart2, TrendingUp, ArrowRightLeft, PhoneOff, CalendarDays,
+  Layers, Users, ChevronLeft, ChevronRight, X, LogOut, UserCircle,
+} from 'lucide-react';
 
 const NAV = [
   {
     group: 'Reports',
     items: [
-      { id: 'drishti-report',       label: 'Drishti Report',       icon: TrendingUp      },
-      { id: 'transfer-conversion',              label: 'Transfer Conversion',              icon: ArrowRightLeft  },
-      { id: 'transfer-conversion-unique-calls', label: 'Transfer Conversion Unique Calls', icon: ArrowRightLeft  },
-      { id: 'transfer-agent-wise',             label: 'Agent Wise Transfer Conversion',  icon: Users           },
-      { id: 'self-hangup',          label: 'Self Hangup',          icon: PhoneOff        },
-      { id: 'date-wise',            label: 'Date Wise Report',     icon: CalendarDays    },
-      { id: 'date-wise-campaign',   label: 'Date Wise Campaign',   icon: Layers          },
-      { id: 'sales-conversion',     label: 'Sales Conversion',     icon: Users           },
-      { id: 'sales-hyderabad',      label: 'Sales Hyderabad',      icon: Users           },
-      { id: 'doctor-sales',         label: 'Doctor Sales',         icon: Users           },
+      { id: 'drishti-report',                    label: 'Drishti Report',                    icon: TrendingUp     },
+      { id: 'transfer-conversion',               label: 'Transfer Conversion',               icon: ArrowRightLeft },
+      { id: 'transfer-conversion-unique-calls',  label: 'Transfer Conversion Unique Calls',  icon: ArrowRightLeft },
+      { id: 'transfer-agent-wise',               label: 'Agent Wise Transfer Conversion',    icon: Users          },
+      { id: 'self-hangup',                       label: 'Self Hangup',                       icon: PhoneOff       },
+      { id: 'date-wise',                         label: 'Date Wise Report',                  icon: CalendarDays   },
+      { id: 'date-wise-campaign',                label: 'Date Wise Campaign',                icon: Layers         },
+      { id: 'sales-conversion',                  label: 'Sales Conversion',                  icon: Users          },
+      { id: 'sales-hyderabad',                   label: 'Sales Hyderabad',                   icon: Users          },
+      { id: 'doctor-sales',                      label: 'Doctor Sales',                      icon: Users          },
     ],
   },
 ];
 
-/* ── Shared nav list ── */
 const NavList = ({ activePage, onNavigate, collapsed }) => (
   <nav className="flex-1 px-2 py-4 overflow-y-auto space-y-4">
     {NAV.map((group) => (
@@ -44,8 +46,6 @@ const NavList = ({ activePage, onNavigate, collapsed }) => (
               >
                 <Icon size={16} className="shrink-0" />
                 {!collapsed && <span className="truncate">{label}</span>}
-
-                {/* tooltip when collapsed */}
                 {collapsed && (
                   <span className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 shadow-xl border border-slate-700 transition-opacity duration-150">
                     {label}
@@ -60,8 +60,42 @@ const NavList = ({ activePage, onNavigate, collapsed }) => (
   </nav>
 );
 
+/* ── User info + logout (bottom of sidebar) ── */
+const UserPanel = ({ user, onLogout, collapsed }) => (
+  <div className={`border-t border-slate-700/50 ${collapsed ? 'px-2 py-3' : 'px-3 py-3'}`}>
+    {collapsed ? (
+      <button
+        onClick={onLogout}
+        title="Sign out"
+        className="w-full flex items-center justify-center p-2 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+      >
+        <LogOut size={16} />
+      </button>
+    ) : (
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 bg-slate-700 flex items-center justify-center shrink-0">
+          <UserCircle size={18} className="text-slate-300" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-white truncate leading-tight">
+            {user?.fullName || user?.username || 'User'}
+          </p>
+          <p className="text-[10px] text-slate-500 truncate">{user?.email || ''}</p>
+        </div>
+        <button
+          onClick={onLogout}
+          title="Sign out"
+          className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
+        >
+          <LogOut size={15} />
+        </button>
+      </div>
+    )}
+  </div>
+);
+
 /* ── Main Sidebar ── */
-const Sidebar = ({ activePage, onNavigate, collapsed, onToggleCollapse, mobileOpen, onMobileClose }) => (
+const Sidebar = ({ activePage, onNavigate, collapsed, onToggleCollapse, mobileOpen, onMobileClose, user, onLogout }) => (
   <>
     {/* ─── Desktop sidebar ─── */}
     <aside
@@ -72,7 +106,7 @@ const Sidebar = ({ activePage, onNavigate, collapsed, onToggleCollapse, mobileOp
       <div className={`flex items-center h-14 shrink-0 border-b border-slate-700/50 transition-all duration-300
         ${collapsed ? 'justify-center px-0' : 'px-4 gap-3'}`}
       >
-        <div className="w-8 h-8 bg-blue-600 flex items-center justify-center shrink-0 shrink-0">
+        <div className="w-8 h-8 bg-blue-600 flex items-center justify-center shrink-0">
           <BarChart2 size={17} className="text-white" />
         </div>
         {!collapsed && (
@@ -88,7 +122,7 @@ const Sidebar = ({ activePage, onNavigate, collapsed, onToggleCollapse, mobileOp
       {/* Collapse toggle */}
       <button
         onClick={onToggleCollapse}
-        className={`flex items-center gap-2 mx-2 mb-2 px-3 py-2 text-slate-500 hover:text-white hover:bg-slate-800 transition-colors text-xs font-medium
+        className={`flex items-center gap-2 mx-2 mb-1 px-3 py-2 text-slate-500 hover:text-white hover:bg-slate-800 transition-colors text-xs font-medium
           ${collapsed ? 'justify-center' : ''}`}
       >
         {collapsed
@@ -97,11 +131,7 @@ const Sidebar = ({ activePage, onNavigate, collapsed, onToggleCollapse, mobileOp
         }
       </button>
 
-      {!collapsed && (
-        <div className="px-4 py-3 border-t border-slate-700/50">
-          <p className="text-[10px] text-slate-600">v{import.meta.env.VITE_APP_VERSION} · Drishti Reports</p>
-        </div>
-      )}
+      <UserPanel user={user} onLogout={onLogout} collapsed={collapsed} />
     </aside>
 
     {/* ─── Mobile drawer ─── */}
@@ -112,7 +142,7 @@ const Sidebar = ({ activePage, onNavigate, collapsed, onToggleCollapse, mobileOp
       {/* Logo + close */}
       <div className="flex items-center justify-between px-4 h-14 border-b border-slate-700/50 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-blue-600 flex items-center justify-center">
             <BarChart2 size={17} className="text-white" />
           </div>
           <div>
@@ -130,9 +160,7 @@ const Sidebar = ({ activePage, onNavigate, collapsed, onToggleCollapse, mobileOp
 
       <NavList activePage={activePage} onNavigate={onNavigate} collapsed={false} />
 
-      <div className="px-4 py-3 border-t border-slate-700/50">
-        <p className="text-[10px] text-slate-600">v{import.meta.env.VITE_APP_VERSION} · Drishti Reports</p>
-      </div>
+      <UserPanel user={user} onLogout={onLogout} collapsed={false} />
     </aside>
   </>
 );
