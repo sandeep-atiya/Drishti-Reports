@@ -16,6 +16,7 @@ let db = null;
 // from scratch with the correct formula.
 const CALLS_SCHEMA_VERSION    = '2';  // bumped: COUNT(*) → COUNT(DISTINCT ch_call_id)
 const TRANSFER_SCHEMA_VERSION = '3';  // bumped: removed hangup/call_drop/talk_time filters
+const HANGUP_SCHEMA_VERSION   = '2';  // bumped: username → udh_user_id as primary identifier
 
 const initSchema = (db) => {
   db.exec(`
@@ -63,7 +64,7 @@ const initSchema = (db) => {
     -- Pre-aggregated Self Hangup counts per agent per day (from PostgreSQL)
     CREATE TABLE IF NOT EXISTS hangup_daily (
       summary_date          TEXT    NOT NULL,
-      username              TEXT    NOT NULL,
+      udh_user_id           TEXT    NOT NULL DEFAULT '',
       campaign_name         TEXT    NOT NULL DEFAULT '',
       agent_hangup_phone    INTEGER NOT NULL DEFAULT 0,
       agent_hangup_ui       INTEGER NOT NULL DEFAULT 0,
@@ -71,7 +72,7 @@ const initSchema = (db) => {
       system_hangup         INTEGER NOT NULL DEFAULT 0,
       system_media          INTEGER NOT NULL DEFAULT 0,
       system_recording      INTEGER NOT NULL DEFAULT 0,
-      PRIMARY KEY (summary_date, username, campaign_name)
+      PRIMARY KEY (summary_date, udh_user_id, campaign_name)
     );
     CREATE INDEX IF NOT EXISTS idx_hangup_date ON hangup_daily (summary_date);
   `);
@@ -108,6 +109,31 @@ export const getSQLite = () => {
       db.prepare('DELETE FROM transfer_daily').run();
       db.prepare("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('transfer_schema_version', ?)")
         .run(TRANSFER_SCHEMA_VERSION);
+    }
+
+    const storedHangupVer = db
+      .prepare("SELECT value FROM sync_meta WHERE key = 'hangup_schema_version'")
+      .get();
+    if (!storedHangupVer || storedHangupVer.value !== HANGUP_SCHEMA_VERSION) {
+      logger.warn('[SQLite] hangup_schema_version mismatch — rebuilding hangup_daily for full re-sync');
+      db.prepare('DROP TABLE IF EXISTS hangup_daily').run();
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS hangup_daily (
+          summary_date          TEXT    NOT NULL,
+          udh_user_id           TEXT    NOT NULL DEFAULT '',
+          campaign_name         TEXT    NOT NULL DEFAULT '',
+          agent_hangup_phone    INTEGER NOT NULL DEFAULT 0,
+          agent_hangup_ui       INTEGER NOT NULL DEFAULT 0,
+          customer_hangup_phone INTEGER NOT NULL DEFAULT 0,
+          system_hangup         INTEGER NOT NULL DEFAULT 0,
+          system_media          INTEGER NOT NULL DEFAULT 0,
+          system_recording      INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (summary_date, udh_user_id, campaign_name)
+        );
+        CREATE INDEX IF NOT EXISTS idx_hangup_date ON hangup_daily (summary_date);
+      `);
+      db.prepare("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('hangup_schema_version', ?)")
+        .run(HANGUP_SCHEMA_VERSION);
     }
 
     logger.info('[SQLite] Ready at ' + DB_PATH);

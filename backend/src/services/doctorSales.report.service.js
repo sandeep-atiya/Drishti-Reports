@@ -116,7 +116,7 @@ const doctorSalesService = {
         const verifiedTicketSize = verified > 0 ? Math.round(verifiedAmount / verified) : 0;
 
         return {
-          "Doctor's Name":        row.agent_name || row.agent_id || 'Unknown',
+          "Doctor's Name":        row.agent_id || row.agent_name || 'Unknown',
           'Campaign':             row.campaign_name || '',
           '_campaignKey':         getCampaignKey(row.campaign_name),
           'Calls':                calls,

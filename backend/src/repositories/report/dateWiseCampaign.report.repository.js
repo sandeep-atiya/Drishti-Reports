@@ -31,7 +31,25 @@ export const pgGetCallsByCampaignDate = ({ startDate, endDate }) => {
        TO_CHAR(ch_date_added::date, 'YYYY-MM-DD')  AS call_date,
        ch_campaign_id                               AS campaign_id,
        campaign_name,
-       COUNT(DISTINCT ch_call_id)::int              AS calls
+       (
+         COUNT(DISTINCT ch_call_id) FILTER (
+           WHERE ch_system_disposition = 'CONNECTED'
+             AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
+         )
+         - COUNT(DISTINCT ch_call_id) FILTER (
+           WHERE ch_system_disposition = 'CONNECTED'
+             AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
+             AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'CALL DROP')
+             AND COALESCE(udh_talk_time, 0) < 5000
+         )
+         + COUNT(DISTINCT ch_call_id) FILTER (
+           WHERE ch_system_disposition = 'CONNECTED'
+             AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
+             AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'CALL DROP')
+             AND uch_talk_time IS NULL
+             AND UPPER(COALESCE(ch_hangup_details, '')) IN ('CUSTOMER_HANGUP_PHONE', 'CUSTOMER_HANGUP_UI')
+         )
+       )::int AS calls
      FROM acd_interval_denormalized_entity
      WHERE ${startExpr}
        AND ${endExpr}

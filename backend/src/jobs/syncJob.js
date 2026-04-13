@@ -269,7 +269,7 @@ const _upsertHangupRows = (db, rows) => {
   if (!rows.length) return;
   const upsert = db.prepare(`
     INSERT OR REPLACE INTO hangup_daily
-      (summary_date, username, campaign_name,
+      (summary_date, udh_user_id, campaign_name,
        agent_hangup_phone, agent_hangup_ui, customer_hangup_phone,
        system_hangup, system_media, system_recording)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -278,7 +278,7 @@ const _upsertHangupRows = (db, rows) => {
     for (const r of rs) {
       upsert.run(
         String(r.summary_date),
-        r.username,
+        r.udh_user_id || '',
         r.campaign_name || '',
         Number(r.agent_hangup_phone),
         Number(r.agent_hangup_ui),
@@ -294,7 +294,7 @@ const _upsertHangupRows = (db, rows) => {
 const buildHangupQuery = (fromStr, toStr) => `
   SELECT
     ch_date_added::date                                                            AS summary_date,
-    username,
+    COALESCE(NULLIF(BTRIM(udh_user_id), ''), username)                            AS udh_user_id,
     COALESCE(campaign_name, '')                                                    AS campaign_name,
     COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'AGENT_HANGUP_PHONE')       AS agent_hangup_phone,
     COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'AGENT_HANGUP_UI')          AS agent_hangup_ui,
@@ -303,10 +303,11 @@ const buildHangupQuery = (fromStr, toStr) => `
     COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'SYSTEM_MEDIA')             AS system_media,
     COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'SYSTEM_RECORDING')         AS system_recording
   FROM acd_interval_denormalized_entity
-  WHERE username IS NOT NULL AND username <> ''
+  WHERE COALESCE(NULLIF(BTRIM(udh_user_id), ''), username) IS NOT NULL
+    AND COALESCE(NULLIF(BTRIM(udh_user_id), ''), username) <> ''
     ${fromStr ? `AND ch_date_added >= '${fromStr}'::date` : ''}
     ${toStr   ? `AND ch_date_added <  '${toStr}'::date`  : ''}
-  GROUP BY ch_date_added::date, username, campaign_name`;
+  GROUP BY ch_date_added::date, COALESCE(NULLIF(BTRIM(udh_user_id), ''), username), campaign_name`;
 
 const syncHangup = async (db, syncFrom) => {
   if (!syncFrom) {

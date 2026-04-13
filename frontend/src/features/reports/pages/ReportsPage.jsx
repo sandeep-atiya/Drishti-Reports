@@ -1,7 +1,6 @@
-import { useState } from 'react';
 import {
   Phone, ShoppingCart, CheckCircle, TrendingUp,
-  BarChart2, Users, Menu, AlertCircle, FileSpreadsheet,
+  BarChart2, Menu, AlertCircle, FileSpreadsheet,
 } from 'lucide-react';
 import { useReports }    from '../hooks/useReports';
 import ReportFilters     from '../components/ReportFilters';
@@ -106,7 +105,6 @@ const Skeleton = () => (
 ══════════════════════════════════════════════ */
 const ReportsPage = ({ onMenuToggle }) => {
   const { data, loading, loadingMsg, error, fetchReport } = useReports();
-  const [activeTab, setActiveTab] = useState('campaign');
 
   /* Aggregate campaign-level KPIs */
   const kpi = (() => {
@@ -120,7 +118,7 @@ const ReportsPage = ({ onMenuToggle }) => {
     return { calls, orders, verified, revenue };
   })();
 
-  const rows = data ? (activeTab === 'campaign' ? data.campaignReport : data.agentReport) : [];
+  const rows = data?.campaignReport ?? [];
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -224,13 +222,14 @@ const ReportsPage = ({ onMenuToggle }) => {
             {/* Report table card */}
             <div className="bg-white border border-slate-200 shadow-sm overflow-hidden">
 
-              {/* Tab bar */}
-              <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/50">
-                <div className="flex gap-6">
-                  <Tab active={activeTab === 'campaign'} onClick={() => setActiveTab('campaign')} icon={BarChart2} label="Campaign Report" count={data.campaignReport.length} />
-                  <Tab active={activeTab === 'agent'}    onClick={() => setActiveTab('agent')}    icon={Users}    label="Agent Report"    count={data.agentReport.length}    />
+              {/* Header bar */}
+              <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/50 px-4 py-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-indigo-600">
+                  <BarChart2 size={15} />
+                  <span>Campaign Report</span>
+                  <span className="text-[11px] px-1.5 py-0.5 font-bold bg-indigo-100 text-indigo-700 min-w-[22px] text-center">{data.campaignReport.length}</span>
                 </div>
-                <div className="px-4 hidden sm:flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-2">
                   <span className="w-2 h-2 bg-emerald-400 animate-pulse shrink-0" />
                   <span className="text-xs font-medium text-slate-500 font-mono">{data.startDate} — {data.endDate}</span>
                 </div>

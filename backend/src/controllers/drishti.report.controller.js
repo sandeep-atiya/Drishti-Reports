@@ -19,22 +19,10 @@ const COLUMNS = [
   'RPC (Revenue per Call)',
 ];
 
-const formatReport = ({ campaignData, agentData }) => ({
+const formatReport = ({ campaignData }) => ({
   columns: COLUMNS,
   campaignReport: campaignData.map((r) => ({
     Campaign:                 r.campaign,
-    Calls:                    r.calls,
-    Orders:                   r.orders,
-    Verified:                 r.verified,
-    'Verified Amount':        r.verifiedAmount,
-    'Verified Ticket Size':   r.verifiedTicketSize,
-    'Order Conversion':       r.orderConversion,
-    'Verified Conversion':    r.verifiedConversion,
-    'Verification %':         r.verificationPct,
-    'RPC (Revenue per Call)': r.rpc,
-  })),
-  agentReport: agentData.map((r) => ({
-    Campaign:                 r.agent,
     Calls:                    r.calls,
     Orders:                   r.orders,
     Verified:                 r.verified,
@@ -59,10 +47,10 @@ export const getDrishtiReport = asyncHandler(async (req, res) => {
 
   if (diffDays <= env.LARGE_RANGE_DAYS) {
     // ── Synchronous path ─────────────────────────────────────────────────
-    const { campaignData, agentData } = await drishtiReportService.getReport({ startDate, endDate });
+    const { campaignData } = await drishtiReportService.getReport({ startDate, endDate });
     return res.status(200).json({
       success: true, startDate, endDate, async: false,
-      ...formatReport({ campaignData, agentData }),
+      ...formatReport({ campaignData }),
     });
   }
 
@@ -101,7 +89,7 @@ export const getJobStatus = asyncHandler(async (req, res) => {
     return res.status(200).json({
       success: true,
       status:  'completed',
-      ...formatReport(job.result),
+      ...formatReport({ campaignData: job.result.campaignData }),
     });
   }
 
