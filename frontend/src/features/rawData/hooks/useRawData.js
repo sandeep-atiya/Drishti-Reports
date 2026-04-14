@@ -2,9 +2,10 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { fetchRawData } from '../services/rawData.api';
 
 export const useRawData = () => {
-  const [data,    setData]    = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState(null);
+  const [data,       setData]       = useState(null);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState(null);
+  const [lastParams, setLastParams] = useState(null);
 
   const abortRef = useRef(null);
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -17,6 +18,7 @@ export const useRawData = () => {
     setData(null);
     setLoading(true);
     setError(null);
+    setLastParams(params);
 
     try {
       const response = await fetchRawData(params);
@@ -29,5 +31,5 @@ export const useRawData = () => {
     }
   }, []);
 
-  return { data, loading, error, fetchReport };
+  return { data, loading, error, fetchReport, lastParams };
 };

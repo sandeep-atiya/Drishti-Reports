@@ -2,6 +2,7 @@ import { Database, Menu, AlertCircle, FileSpreadsheet } from 'lucide-react';
 import { useRawData }            from '../hooks/useRawData';
 import RawDataFilters            from '../components/RawDataFilters';
 import RawDataTable              from '../components/RawDataTable';
+import RawDataKpiCards           from '../components/RawDataKpiCards';
 import { exportRawDataToExcel }  from '../utils/rawDataHelpers';
 
 const Skeleton = () => (
@@ -15,7 +16,7 @@ const Skeleton = () => (
 );
 
 const RawDataPage = ({ onMenuToggle }) => {
-  const { data, loading, error, fetchReport } = useRawData();
+  const { data, loading, error, fetchReport, lastParams } = useRawData();
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -74,26 +75,37 @@ const RawDataPage = ({ onMenuToggle }) => {
         )}
 
         {!loading && data && (
-          <div className="bg-white border border-slate-200 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-slate-50/50">
-              <div className="flex items-center gap-2">
-                <Database size={15} className="text-blue-500" />
-                <span className="text-sm font-semibold text-slate-700">Query Results</span>
-                <span className="text-[11px] px-1.5 py-0.5 font-bold bg-blue-100 text-blue-700 min-w-[22px] text-center">
-                  {data.count}
-                </span>
-                {data.limit > 0 && data.count >= data.limit && (
-                  <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 font-semibold">
-                    limit reached — use All or narrow filters
+          <>
+            {/* ── KPI Summary Cards ──────────────────────────────────────── */}
+            <RawDataKpiCards
+              rows={data.rows}
+              startDate={data.startDate || ''}
+              endDate={data.endDate   || ''}
+              fetchParams={lastParams}
+            />
+
+            {/* ── Raw Data Table ─────────────────────────────────────────── */}
+            <div className="bg-white border border-slate-200 shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-slate-50/50">
+                <div className="flex items-center gap-2">
+                  <Database size={15} className="text-blue-500" />
+                  <span className="text-sm font-semibold text-slate-700">Query Results</span>
+                  <span className="text-[11px] px-1.5 py-0.5 font-bold bg-blue-100 text-blue-700 min-w-[22px] text-center">
+                    {data.count}
                   </span>
-                )}
+                  {data.limit > 0 && data.count >= data.limit && (
+                    <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 font-semibold">
+                      limit reached — use All or narrow filters
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs font-mono text-slate-400 hidden sm:block">
+                  {data.startDate} — {data.endDate}
+                </span>
               </div>
-              <span className="text-xs font-mono text-slate-400 hidden sm:block">
-                {data.startDate} — {data.endDate}
-              </span>
+              <RawDataTable rows={data.rows} />
             </div>
-            <RawDataTable rows={data.rows} />
-          </div>
+          </>
         )}
 
         {!data && !loading && !error && (
