@@ -1,10 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
-import {
-  CalendarDays, ChevronDown, Check, Search,
-  Calendar, Clock3, CalendarRange, SlidersHorizontal,
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { CalendarDays, ChevronDown, Search, X, Clock3, CalendarRange, SlidersHorizontal } from 'lucide-react';
 
-/* ── date helpers (runtime-relative, works for any year) ── */
 const pad         = (n) => String(n).padStart(2, '0');
 const fmtDate     = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
 const daysInMonth = (y, m) => new Date(y, m, 0).getDate();
@@ -13,11 +9,11 @@ const todayStr    = () => { const { y, m, d } = now(); return fmtDate(y, m, d); 
 
 const PRESETS = [
   {
-    id: 'this-month', label: 'This Month', icon: CalendarDays,
+    id: 'this-month', label: 'This Month', short: 'This Mo.',
     get: () => { const { y, m, d } = now(); return { start: fmtDate(y, m, 1), end: fmtDate(y, m, d) }; },
   },
   {
-    id: 'last-month', label: 'Last Month', icon: Calendar,
+    id: 'last-month', label: 'Last Month', short: 'Last Mo.',
     get: () => {
       const { y, m } = now();
       const pm = m === 1 ? 12 : m - 1, py = m === 1 ? y - 1 : y;
@@ -25,7 +21,7 @@ const PRESETS = [
     },
   },
   {
-    id: 'last-3', label: 'Last 3 Months', icon: Clock3,
+    id: 'last-3', label: 'Last 3 Months', short: '3 Months',
     get: () => {
       const { y, m, d } = now();
       const raw = m - 2; const sm = raw <= 0 ? raw + 12 : raw, sy = raw <= 0 ? y - 1 : y;
@@ -33,7 +29,7 @@ const PRESETS = [
     },
   },
   {
-    id: 'last-6', label: 'Last 6 Months', icon: CalendarRange,
+    id: 'last-6', label: 'Last 6 Months', short: '6 Months',
     get: () => {
       const { y, m, d } = now();
       const raw = m - 5; const sm = raw <= 0 ? raw + 12 : raw, sy = raw <= 0 ? y - 1 : y;
@@ -41,25 +37,18 @@ const PRESETS = [
     },
   },
   {
-    id: 'this-year', label: 'This Year', icon: CalendarRange,
+    id: 'this-year', label: 'This Year', short: 'This Yr.',
     get: () => { const { y, m, d } = now(); return { start: fmtDate(y, 1, 1), end: fmtDate(y, m, d) }; },
   },
-  { id: 'custom', label: 'Custom Range', icon: SlidersHorizontal, get: null },
+  { id: 'custom', label: 'Custom Range', short: 'Custom', get: null },
 ];
 
 const ReportFilters = ({ onFetch, loading }) => {
-  const init                          = PRESETS[1].get();
-  const [activeId,  setActiveId]      = useState('last-month');
-  const [startDate, setStartDate]     = useState(init.start);
-  const [endDate,   setEndDate]       = useState(init.end);
-  const [open,      setOpen]          = useState(false);
-  const ref                           = useRef(null);
-
-  useEffect(() => {
-    const fn = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', fn);
-    return () => document.removeEventListener('mousedown', fn);
-  }, []);
+  const init                       = PRESETS[1].get();
+  const [activeId,  setActiveId]   = useState('last-month');
+  const [startDate, setStartDate]  = useState(init.start);
+  const [endDate,   setEndDate]    = useState(init.end);
+  const [showCustom, setShowCustom] = useState(false);
 
   const pick = (p) => {
     setActiveId(p.id);
@@ -67,110 +56,160 @@ const ReportFilters = ({ onFetch, loading }) => {
       const { start, end } = p.get();
       setStartDate(start);
       setEndDate(end);
-      setOpen(false);
+      setShowCustom(false);
     } else {
-      // Custom Range: reset to today so calendar opens on the current month
-      const t = todayStr();
-      setStartDate(t);
-      setEndDate(t);
+      setShowCustom(true);
     }
   };
 
-  const active   = PRESETS.find((p) => p.id === activeId);
-  const isCustom = activeId === 'custom';
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (startDate && endDate && startDate <= endDate) onFetch({ startDate, endDate });
+  };
+
+  const canGenerate = !loading && startDate && endDate && startDate <= endDate;
 
   return (
-    <form
-      onSubmit={(e) => { e.preventDefault(); if (startDate && endDate) onFetch({ startDate, endDate }); }}
-      className="bg-white border border-slate-200 shadow-sm px-5 py-4"
-    >
-      <div className="flex flex-wrap items-end gap-4">
+    <form onSubmit={handleSubmit}>
+      <div style={{
+        background: '#fff', borderRadius: 14, border: '1px solid #edf0f7',
+        boxShadow: '0 2px 8px rgba(0,0,0,.05)', overflow: 'hidden',
+      }}>
+        {/* ── header strip ── */}
+        <div style={{
+          padding: '13px 20px', borderBottom: '1px solid #edf0f7',
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: 'linear-gradient(135deg,#f8faff,#f3f0ff)',
+        }}>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CalendarDays size={14} color="#fff" />
+          </div>
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 800, color: '#0d1117', letterSpacing: '-.2px' }}>Report Filters</p>
+            <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>Select a period to generate the Drishti Report</p>
+          </div>
+        </div>
 
-        {/* ── Period dropdown ── */}
-        <div className="relative" ref={ref}>
-          <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
-            Period
-          </label>
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            className="flex items-center gap-2 pl-3.5 pr-3 py-2.5 bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-700 hover:border-indigo-400 hover:bg-white transition-all min-w-[180px] shadow-sm"
-          >
-            {active && <active.icon size={14} className="text-indigo-500 shrink-0" />}
-            <span className="flex-1 text-left">{active?.label}</span>
-            <ChevronDown size={13} className={`text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-          </button>
-
-          {open && (
-            <div className="absolute top-[calc(100%+8px)] left-0 z-50 w-52 bg-white border border-slate-200 shadow-xl py-1 overflow-hidden">
+        <div style={{ padding: '16px 20px', display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 14 }}>
+          {/* ── Period preset pills ── */}
+          <div style={{ flex: 1, minWidth: 280 }}>
+            <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.8px', marginBottom: 8 }}>
+              Period
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {PRESETS.map((p) => {
-                const Icon = p.icon;
-                const sel  = activeId === p.id;
+                const active = activeId === p.id;
                 return (
                   <button
-                    key={p.id} type="button" onClick={() => pick(p)}
-                    className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${
-                      sel ? 'bg-indigo-600 text-white' : 'text-slate-700 hover:bg-slate-50'
-                    }`}
+                    key={p.id}
+                    type="button"
+                    onClick={() => pick(p)}
+                    style={{
+                      height: 34, padding: '0 14px', borderRadius: 8,
+                      border: active ? 'none' : '1px solid #e2e8f0',
+                      background: active ? 'linear-gradient(135deg,#4f46e5,#7c3aed)' : '#f8fafc',
+                      color: active ? '#fff' : '#4a5568',
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      boxShadow: active ? '0 2px 8px rgba(79,70,229,.3)' : 'none',
+                      transition: 'all .15s',
+                    }}
                   >
-                    <Icon size={14} className={sel ? 'text-indigo-200' : 'text-slate-400'} />
-                    <span className="flex-1 text-left font-medium">{p.label}</span>
-                    {sel && <Check size={13} className="text-indigo-200" />}
+                    <span className="hidden sm:inline">{p.label}</span>
+                    <span className="sm:hidden">{p.short}</span>
                   </button>
                 );
               })}
+            </div>
 
-              {isCustom && (
-                <div className="mx-3 my-2 p-3 bg-slate-50 border border-slate-100 space-y-2.5">
-                  {[['From', startDate, setStartDate, null,       todayStr()],
-                    ['To',   endDate,   setEndDate,   startDate, todayStr()]
-                  ].map(([lbl, val, setter, min, max]) => (
-                    <div key={lbl}>
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">{lbl}</p>
+            {/* ── Custom range inputs ── */}
+            {showCustom && (
+              <div style={{
+                marginTop: 12, padding: '12px 14px',
+                background: '#f8faff', border: '1px solid #c7d2fe',
+                borderRadius: 10, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10,
+              }}>
+                <SlidersHorizontal size={13} color="#6366f1" />
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#4f46e5' }}>Custom Range</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'From', val: startDate, set: setStartDate, min: undefined, max: endDate || todayStr() },
+                    { label: 'To',   val: endDate,   set: setEndDate,   min: startDate, max: todayStr() },
+                  ].map(({ label, val, set, min, max }) => (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>{label}</span>
                       <input
                         type="date" value={val} min={min} max={max}
-                        onChange={(e) => setter(e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-400 transition-all"
+                        onChange={(e) => set(e.target.value)}
+                        style={{
+                          height: 32, padding: '0 10px', borderRadius: 7,
+                          border: '1px solid #c7d2fe', background: '#fff',
+                          fontSize: 12, color: '#0d1117', fontFamily: 'inherit', outline: 'none',
+                        }}
                       />
                     </div>
                   ))}
                 </div>
-              )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Selected range badge ── */}
+          {startDate && endDate && (
+            <div style={{ flexShrink: 0 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.8px', marginBottom: 8 }}>
+                Selected
+              </p>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '7px 13px', borderRadius: 8,
+                background: '#eef2ff', border: '1px solid #c7d2fe',
+              }}>
+                <CalendarDays size={12} color="#6366f1" />
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#4f46e5', fontVariantNumeric: 'tabular-nums' }}>
+                  {startDate}
+                </span>
+                <span style={{ fontSize: 11, color: '#a5b4fc', fontWeight: 600 }}>→</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#4f46e5', fontVariantNumeric: 'tabular-nums' }}>
+                  {endDate}
+                </span>
+              </div>
             </div>
           )}
-        </div>
 
-        {/* ── Date range badge ── */}
-        {startDate && endDate && (
-          <div>
-            <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
-              Selected Range
-            </label>
-            <div className="flex items-center gap-2 px-3.5 py-2.5 bg-indigo-50 border border-indigo-100 text-sm font-mono font-semibold text-indigo-700">
-              <CalendarDays size={13} className="text-indigo-400 shrink-0" />
-              <span>{startDate}</span>
-              <span className="text-indigo-300 font-sans font-bold">→</span>
-              <span>{endDate}</span>
-            </div>
+          {/* ── Generate button ── */}
+          <div style={{ flexShrink: 0 }}>
+            <p style={{ fontSize: 10, color: 'transparent', marginBottom: 8, userSelect: 'none' }}>.</p>
+            <button
+              type="submit"
+              disabled={!canGenerate}
+              style={{
+                height: 40, padding: '0 22px', borderRadius: 10, border: 'none',
+                background: canGenerate ? 'linear-gradient(135deg,#4f46e5,#7c3aed)' : '#e2e8f0',
+                color: canGenerate ? '#fff' : '#94a3b8',
+                fontSize: 13, fontWeight: 700, cursor: canGenerate ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', gap: 8,
+                fontFamily: 'inherit',
+                boxShadow: canGenerate ? '0 4px 14px rgba(79,70,229,.35)' : 'none',
+                transition: 'all .15s',
+              }}
+            >
+              {loading ? (
+                <>
+                  <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'dSpin .7s linear infinite', flexShrink: 0 }} />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <Search size={14} />
+                  Generate Report
+                </>
+              )}
+            </button>
           </div>
-        )}
-
-        {/* ── Generate button ── */}
-        <div className="ml-auto">
-          <label className="block text-[10px] font-semibold text-transparent uppercase tracking-widest mb-1.5 select-none">.</label>
-          <button
-            type="submit"
-            disabled={loading || !startDate || !endDate}
-            className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-indigo-200/60"
-          >
-            {loading
-              ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white animate-spin" />Generating…</>
-              : <><Search size={14} />Generate Report</>
-            }
-          </button>
         </div>
-
       </div>
+      <style>{`@keyframes dSpin{to{transform:rotate(360deg)}}`}</style>
     </form>
   );
 };

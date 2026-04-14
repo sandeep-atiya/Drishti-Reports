@@ -72,13 +72,13 @@ export const pgGetCallsByAgentCampaign = ({ startDate, endDate }) => {
          - COUNT(DISTINCT ch_call_id) FILTER (
            WHERE ch_system_disposition = 'CONNECTED'
              AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
-             AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'CALL DROP')
-             AND COALESCE(udh_talk_time, 0) < 5000
+             AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'Call Drop')
+             AND COALESCE(udh_talk_time, 0) <= 5000
          )
          + COUNT(DISTINCT ch_call_id) FILTER (
            WHERE ch_system_disposition = 'CONNECTED'
              AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
-             AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'CALL DROP')
+             AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'Call Drop')
              AND uch_talk_time IS NULL
              AND UPPER(COALESCE(ch_hangup_details, '')) IN ('CUSTOMER_HANGUP_PHONE', 'CUSTOMER_HANGUP_UI')
          )

@@ -1,33 +1,116 @@
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown } from 'lucide-react';
+import {
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  ChevronDown, ChevronUp, ChevronsUpDown, Search, X,
+} from 'lucide-react';
 import { formatCurrency, formatNumber, computeTotals } from '../utils/reportHelpers';
 
+/* ── column definitions ─────────────────────────────────────────── */
 const COLS = [
-  { key: 'Campaign',               label: 'Campaign',               align: 'left',   minW: 160, type: 'name'     },
-  { key: 'Calls',                  label: 'Calls',                  align: 'right',  minW: 90,  type: 'number'   },
-  { key: 'Orders',                 label: 'Orders',                 align: 'right',  minW: 88,  type: 'number'   },
-  { key: 'Verified',               label: 'Verified',               align: 'right',  minW: 88,  type: 'number'   },
-  { key: 'Verified Amount',        label: 'Verified Amount',        align: 'right',  minW: 148, type: 'currency' },
-  { key: 'Verified Ticket Size',   label: 'Ticket Size',            align: 'right',  minW: 110, type: 'currency' },
-  { key: 'Order Conversion',       label: 'Order Conv.',            align: 'center', minW: 105, type: 'pct'      },
-  { key: 'Verified Conversion',    label: 'Verified Conv.',         align: 'center', minW: 118, type: 'pct'      },
-  { key: 'Verification %',         label: 'Verification %',         align: 'center', minW: 112, type: 'pct'      },
-  { key: 'RPC (Revenue per Call)', label: 'RPC',                    align: 'right',  minW: 95,  type: 'currency' },
+  { key: 'Campaign',               label: 'Campaign',        align: 'left',   minW: 170, type: 'name'     },
+  { key: 'Calls',                  label: 'Calls',           align: 'right',  minW: 90,  type: 'number'   },
+  { key: 'Orders',                 label: 'Orders',          align: 'right',  minW: 88,  type: 'number'   },
+  { key: 'Verified',               label: 'Verified',        align: 'right',  minW: 88,  type: 'number'   },
+  { key: 'Verified Amount',        label: 'Verified Amt.',   align: 'right',  minW: 140, type: 'currency' },
+  { key: 'Verified Ticket Size',   label: 'Ticket Size',     align: 'right',  minW: 110, type: 'currency' },
+  { key: 'Order Conversion',       label: 'Order Conv.',     align: 'center', minW: 105, type: 'pct'      },
+  { key: 'Verified Conversion',    label: 'Verified Conv.',  align: 'center', minW: 118, type: 'pct'      },
+  { key: 'Verification %',         label: 'Verif. %',        align: 'center', minW: 100, type: 'pct'      },
+  { key: 'RPC (Revenue per Call)', label: 'RPC',             align: 'right',  minW: 95,  type: 'currency' },
 ];
 
 const PAGE_SIZES = [10, 25, 50, 100];
 
-const fmtCell = (type, val) => {
-  if (type === 'currency') return formatCurrency(val);
-  if (type === 'number')   return formatNumber(val);
-  return val ?? '—';
+/* ── helpers ─────────────────────────────────────────────────────── */
+const pctNum = (val) => {
+  if (val === null || val === undefined || val === '') return null;
+  const n = parseFloat(String(val).replace('%', ''));
+  return isNaN(n) ? null : n;
 };
 
-/* ── Pagination ── */
+const pctColor = (n) => {
+  if (n === null) return { text: '#64748b', bg: '#f1f5f9', bar: '#cbd5e1' };
+  if (n >= 60)    return { text: '#059669', bg: '#ecfdf5', bar: '#10b981' };
+  if (n >= 40)    return { text: '#d97706', bg: '#fffbeb', bar: '#f59e0b' };
+  return           { text: '#dc2626', bg: '#fef2f2', bar: '#ef4444' };
+};
+
+const numVal = (row, key) => Number(row[key]) || 0;
+
+/* ── sort comparator ─────────────────────────────────────────────── */
+const compareRows = (a, b, key, dir, type) => {
+  let av, bv;
+  if (type === 'pct') {
+    av = pctNum(a[key]) ?? -1;
+    bv = pctNum(b[key]) ?? -1;
+  } else if (type === 'currency' || type === 'number') {
+    av = Number(a[key]) || 0;
+    bv = Number(b[key]) || 0;
+  } else {
+    av = String(a[key] ?? '').toLowerCase();
+    bv = String(b[key] ?? '').toLowerCase();
+  }
+  if (av < bv) return dir === 'asc' ? -1 : 1;
+  if (av > bv) return dir === 'asc' ?  1 : -1;
+  return 0;
+};
+
+/* ── cell renderer ───────────────────────────────────────────────── */
+const Cell = ({ type, val, isTotal }) => {
+  if (type === 'pct') {
+    const n = pctNum(val);
+    const c = pctColor(n);
+    const w = n !== null ? Math.min(n, 100) : 0;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+        <span style={{
+          fontSize: 12, fontWeight: 700, color: isTotal ? c.text : c.text,
+          background: c.bg, padding: '2px 9px', borderRadius: 20,
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          {val ?? '—'}
+        </span>
+        {!isTotal && n !== null && (
+          <div style={{ width: 52, height: 3, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ width: `${w}%`, height: '100%', background: c.bar, borderRadius: 2, transition: 'width .3s' }} />
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (type === 'currency') {
+    const n = Number(val);
+    const text = (isNaN(n) || val == null) ? '—' : '₹' + n.toLocaleString('en-IN');
+    return <span style={{ color: isTotal ? '#059669' : '#059669', fontWeight: isTotal ? 800 : 600, fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>{text}</span>;
+  }
+  if (type === 'number') {
+    const n = Number(val);
+    const text = (isNaN(n) || val == null) ? '—' : n.toLocaleString('en-IN');
+    return <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: isTotal ? 800 : 500 }}>{text}</span>;
+  }
+  if (type === 'name') {
+    return (
+      <span style={{ fontWeight: isTotal ? 900 : 600, fontSize: isTotal ? 11 : 13, textTransform: isTotal ? 'uppercase' : 'none', letterSpacing: isTotal ? '.8px' : 0, color: isTotal ? '#4f46e5' : '#0d1117' }}>
+        {val ?? '—'}
+      </span>
+    );
+  }
+  return <span>{val ?? '—'}</span>;
+};
+
+/* ── sort icon ───────────────────────────────────────────────────── */
+const SortIcon = ({ colKey, sortKey, sortDir }) => {
+  if (colKey !== sortKey) return <ChevronsUpDown size={11} style={{ opacity: .35, flexShrink: 0 }} />;
+  return sortDir === 'asc'
+    ? <ChevronUp   size={11} style={{ color: '#a5b4fc', flexShrink: 0 }} />
+    : <ChevronDown size={11} style={{ color: '#a5b4fc', flexShrink: 0 }} />;
+};
+
+/* ── pagination ──────────────────────────────────────────────────── */
 const Pagination = ({ page, pageSize, total, onPage, onPageSize }) => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const from       = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const to         = Math.min(page * pageSize, total);
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to   = Math.min(page * pageSize, total);
 
   const pages = useMemo(() => {
     if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -36,150 +119,247 @@ const Pagination = ({ page, pageSize, total, onPage, onPageSize }) => {
     return [1, '…', page-1, page, page+1, '…', totalPages];
   }, [page, totalPages]);
 
+  const PgBtn = ({ onClick, disabled, children }) => (
+    <button
+      onClick={onClick} disabled={disabled}
+      style={{
+        width: 30, height: 30, borderRadius: 7, border: 'none',
+        background: 'transparent', cursor: disabled ? 'not-allowed' : 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: disabled ? '#cbd5e1' : '#64748b', transition: 'all .15s',
+      }}
+      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = '#eef2ff'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+    >{children}</button>
+  );
+
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 border-t border-slate-100 bg-white">
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-slate-500">
-          Showing <span className="font-semibold text-slate-700">{from}–{to}</span> of{' '}
-          <span className="font-semibold text-slate-700">{total}</span> results
+    <div style={{
+      display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between',
+      gap: 10, padding: '12px 16px', borderTop: '1px solid #edf0f7', background: '#fafbff',
+    }}>
+      {/* left: showing + page size */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 12, color: '#64748b' }}>
+          Showing <strong style={{ color: '#0d1117' }}>{from}–{to}</strong> of{' '}
+          <strong style={{ color: '#0d1117' }}>{total}</strong>
         </span>
-        <div className="relative">
+        <div style={{ position: 'relative' }}>
           <select
             value={pageSize}
             onChange={(e) => { onPageSize(Number(e.target.value)); onPage(1); }}
-            className="appearance-none pl-2.5 pr-6 py-1 text-xs border border-slate-200 bg-slate-50 text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+            style={{
+              height: 28, padding: '0 24px 0 10px', borderRadius: 7,
+              border: '1px solid #e2e8f0', background: '#fff',
+              fontSize: 12, color: '#4a5568', fontFamily: 'inherit',
+              outline: 'none', cursor: 'pointer', appearance: 'none',
+            }}
           >
             {PAGE_SIZES.map((s) => <option key={s} value={s}>{s} / page</option>)}
           </select>
-          <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <ChevronDown size={10} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
         </div>
       </div>
 
-      <div className="flex items-center gap-1">
-        {[
-          [<ChevronsLeft size={12} />, () => onPage(1),          page === 1],
-          [<ChevronLeft  size={12} />, () => onPage(page - 1),   page === 1],
-        ].map(([icon, fn, dis], i) => (
-          <PgBtn key={i} onClick={fn} disabled={dis}>{icon}</PgBtn>
-        ))}
+      {/* right: page buttons */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <PgBtn onClick={() => onPage(1)}          disabled={page === 1}><ChevronsLeft  size={13} /></PgBtn>
+        <PgBtn onClick={() => onPage(page - 1)}   disabled={page === 1}><ChevronLeft   size={13} /></PgBtn>
         {pages.map((p, i) => p === '…'
-          ? <span key={`e${i}`} className="w-7 text-center text-slate-400 text-xs">…</span>
-          : <button key={p} onClick={() => onPage(p)}
-              className={`w-7 h-7 text-xs font-semibold transition-all ${
-                p === page ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >{p}</button>
+          ? <span key={`e${i}`} style={{ width: 28, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>…</span>
+          : (
+            <button key={p} onClick={() => onPage(p)} style={{
+              width: 30, height: 30, borderRadius: 7, border: 'none',
+              background: p === page ? 'linear-gradient(135deg,#4f46e5,#7c3aed)' : 'transparent',
+              color: p === page ? '#fff' : '#4a5568',
+              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              boxShadow: p === page ? '0 2px 6px rgba(79,70,229,.3)' : 'none',
+              transition: 'all .15s',
+            }}>{p}</button>
+          )
         )}
-        {[
-          [<ChevronRight  size={12} />, () => onPage(page + 1),   page === totalPages],
-          [<ChevronsRight size={12} />, () => onPage(totalPages), page === totalPages],
-        ].map(([icon, fn, dis], i) => (
-          <PgBtn key={i + 10} onClick={fn} disabled={dis}>{icon}</PgBtn>
-        ))}
+        <PgBtn onClick={() => onPage(page + 1)}   disabled={page === totalPages}><ChevronRight  size={13} /></PgBtn>
+        <PgBtn onClick={() => onPage(totalPages)} disabled={page === totalPages}><ChevronsRight size={13} /></PgBtn>
       </div>
     </div>
   );
 };
 
-const PgBtn = ({ onClick, disabled, children }) => (
-  <button onClick={onClick} disabled={disabled}
-    className="w-7 h-7 flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-    {children}
-  </button>
-);
-
-/* ── ReportTable ── */
+/* ══════════════════════════════════════════════════════════════════
+   MAIN TABLE COMPONENT
+══════════════════════════════════════════════════════════════════ */
 const ReportTable = ({ rows = [] }) => {
   const [page,     setPage]     = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [search,   setSearch]   = useState('');
+  const [sortKey,  setSortKey]  = useState('Calls');
+  const [sortDir,  setSortDir]  = useState('desc');
   const [prevRows, setPrevRows] = useState(rows);
 
-  // Derived-state reset: when rows reference changes, reset page during render.
-  // This is the React-recommended alternative to a useEffect setState call.
-  if (prevRows !== rows) {
-    setPrevRows(rows);
+  if (prevRows !== rows) { setPrevRows(rows); setPage(1); setSearch(''); }
+
+  const handleSort = (col) => {
+    if (sortKey === col.key) {
+      setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(col.key);
+      setSortDir('desc');
+    }
     setPage(1);
-  }
+  };
 
-  const totals   = useMemo(() => computeTotals(rows), [rows]);
-  const maxPages = Math.max(1, Math.ceil(rows.length / pageSize));
-  const pageRows = useMemo(() => rows.slice((page - 1) * pageSize, page * pageSize), [rows, page, pageSize]);
+  const filtered = useMemo(() =>
+    search.trim()
+      ? rows.filter((r) => String(r.Campaign ?? '').toLowerCase().includes(search.toLowerCase()))
+      : rows,
+    [rows, search]
+  );
 
+  const sorted = useMemo(() => {
+    const col = COLS.find((c) => c.key === sortKey);
+    if (!col) return filtered;
+    return [...filtered].sort((a, b) => compareRows(a, b, col.key, sortDir, col.type));
+  }, [filtered, sortKey, sortDir]);
+
+  const totals   = useMemo(() => computeTotals(sorted), [sorted]);
+  const maxPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const pageRows = useMemo(() => sorted.slice((page - 1) * pageSize, page * pageSize), [sorted, page, pageSize]);
+
+  /* ── empty state ── */
   if (!rows.length) {
     return (
-      <div className="flex flex-col items-center gap-3 py-16">
-        <div className="w-12 h-12 bg-slate-100 flex items-center justify-center">
-          <svg className="w-6 h-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-              d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '60px 20px', background: '#fafbff' }}>
+        <div style={{ width: 56, height: 56, borderRadius: 14, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         </div>
-        <div className="text-center">
-          <p className="text-sm font-semibold text-slate-600">No records found</p>
-          <p className="text-xs text-slate-400 mt-0.5">Try a different date range</p>
-        </div>
+        <p style={{ fontSize: 14, fontWeight: 700, color: '#4a5568' }}>No records found</p>
+        <p style={{ fontSize: 12, color: '#94a3b8' }}>Try a different date range</p>
       </div>
     );
   }
 
-  const ac = (col) => col.align === 'left' ? 'text-left' : col.align === 'center' ? 'text-center' : 'text-right';
-
   return (
-    <div className="overflow-hidden border border-slate-200">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse" style={{ minWidth: COLS.reduce((s, c) => s + c.minW, 0) }}>
-          {/* ── Sticky header ── */}
-          <thead className="sticky top-0 z-10">
-            <tr className="bg-slate-800">
+    <div style={{ background: '#fff', borderRadius: '0 0 14px 14px', overflow: 'hidden' }}>
+      {/* ── search + stats bar ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        flexWrap: 'wrap', gap: 10, padding: '12px 16px', borderBottom: '1px solid #edf0f7',
+        background: '#fafbff',
+      }}>
+        <div style={{ position: 'relative', minWidth: 220 }}>
+          <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+          <input
+            type="text" placeholder="Search campaign…" value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            style={{
+              height: 32, paddingLeft: 30, paddingRight: search ? 28 : 12, paddingTop: 0, paddingBottom: 0,
+              borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff',
+              fontSize: 12, color: '#0d1117', fontFamily: 'inherit', outline: 'none', width: '100%',
+            }}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 0 }}>
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {search && filtered.length !== rows.length && (
+            <span style={{ fontSize: 11, color: '#6366f1', fontWeight: 700, background: '#eef2ff', padding: '3px 10px', borderRadius: 20 }}>
+              {filtered.length} of {rows.length} campaigns
+            </span>
+          )}
+          <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+            {rows.length} campaign{rows.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+      </div>
+
+      {/* ── table ── */}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{
+          width: '100%', borderCollapse: 'collapse',
+          minWidth: COLS.reduce((s, c) => s + c.minW, 0),
+        }}>
+          {/* HEADER */}
+          <thead>
+            <tr style={{ background: 'linear-gradient(135deg,#1e293b,#0f172a)' }}>
               {COLS.map((col) => (
                 <th
                   key={col.key}
-                  style={{ minWidth: col.minW }}
-                  className={`px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-slate-300 border-b border-slate-700 whitespace-nowrap ${ac(col)}`}
+                  style={{
+                    padding: '13px 14px',
+                    fontSize: 11, fontWeight: 700,
+                    color: '#94a3b8',
+                    textTransform: 'uppercase', letterSpacing: '.7px',
+                    textAlign: col.align,
+                    minWidth: col.minW, whiteSpace: 'nowrap',
+                    cursor: 'pointer', userSelect: 'none',
+                    borderBottom: '2px solid #334155',
+                    transition: 'color .15s',
+                  }}
+                  onClick={() => handleSort(col)}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#e2e8f0'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = col.key === sortKey ? '#a5b4fc' : '#94a3b8'; }}
                 >
-                  {col.label}
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: col.key === sortKey ? '#a5b4fc' : 'inherit' }}>
+                    {col.label}
+                    <SortIcon colKey={col.key} sortKey={sortKey} sortDir={sortDir} />
+                  </div>
                 </th>
               ))}
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-slate-100">
+          {/* BODY */}
+          <tbody>
             {pageRows.map((row, i) => (
-              <tr key={i} className={`transition-colors hover:bg-indigo-50/40 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+              <tr
+                key={i}
+                style={{
+                  background: i % 2 === 0 ? '#fff' : '#fafbff',
+                  borderBottom: '1px solid #f1f5f9',
+                  transition: 'background .12s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#eef2ff'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafbff'; }}
+              >
                 {COLS.map((col) => (
                   <td
                     key={col.key}
-                    style={{ minWidth: col.minW }}
-                    className={`px-4 py-3.5 whitespace-nowrap ${ac(col)} ${
-                      col.type === 'name'     ? 'font-semibold text-slate-800 text-sm' :
-                      col.type === 'currency' ? 'font-medium text-emerald-700 text-sm tabular-nums' :
-                      col.type === 'pct'      ? 'font-semibold text-indigo-600 text-sm tabular-nums' :
-                      'text-slate-600 text-sm tabular-nums'
-                    }`}
+                    style={{
+                      padding: '11px 14px',
+                      textAlign: col.align,
+                      minWidth: col.minW, whiteSpace: 'nowrap',
+                      fontSize: 13, color: '#374151',
+                      borderLeft: col.key === 'Campaign' ? '3px solid transparent' : undefined,
+                    }}
                   >
-                    {fmtCell(col.type, row[col.key])}
+                    <Cell type={col.type} val={row[col.key]} isTotal={false} />
                   </td>
                 ))}
               </tr>
             ))}
           </tbody>
 
-          {/* ── Totals row ── */}
+          {/* TOTALS */}
           {totals && (
             <tfoot>
-              <tr className="bg-slate-100 border-t-2 border-slate-300">
+              <tr style={{ background: 'linear-gradient(135deg,#eef2ff,#f5f3ff)', borderTop: '2px solid #c7d2fe' }}>
                 {COLS.map((col) => (
                   <td
                     key={col.key}
-                    style={{ minWidth: col.minW }}
-                    className={`px-4 py-3.5 whitespace-nowrap ${ac(col)} ${
-                      col.type === 'name'     ? 'text-xs font-black uppercase tracking-widest text-slate-800' :
-                      col.type === 'currency' ? 'font-bold text-emerald-700 text-sm tabular-nums' :
-                      col.type === 'pct'      ? 'font-bold text-indigo-700 text-sm tabular-nums' :
-                      'font-bold text-slate-800 text-sm tabular-nums'
-                    }`}
+                    style={{
+                      padding: '12px 14px', textAlign: col.align,
+                      minWidth: col.minW, whiteSpace: 'nowrap',
+                      fontSize: 13,
+                      borderLeft: col.key === 'Campaign' ? '3px solid #6366f1' : undefined,
+                    }}
                   >
-                    {fmtCell(col.type, totals[col.key])}
+                    <Cell type={col.type} val={totals[col.key]} isTotal />
                   </td>
                 ))}
               </tr>
@@ -188,9 +368,10 @@ const ReportTable = ({ rows = [] }) => {
         </table>
       </div>
 
-      {rows.length > pageSize && (
+      {/* PAGINATION */}
+      {sorted.length > pageSize && (
         <Pagination
-          page={page} pageSize={pageSize} total={rows.length}
+          page={page} pageSize={pageSize} total={sorted.length}
           onPage={(p) => setPage(Math.max(1, Math.min(p, maxPages)))}
           onPageSize={(s) => { setPageSize(s); setPage(1); }}
         />
