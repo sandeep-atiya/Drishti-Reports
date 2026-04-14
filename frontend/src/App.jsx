@@ -10,6 +10,7 @@ import DateWiseCampaignPage     from './features/dateWiseCampaign/pages/DateWise
 import SalesConversionPage      from './features/salesConversion/pages/SalesConversionPage';
 import SalesHydrabadPage        from './features/salesHyderabad/pages/SalesHydrabadPage';
 import DoctorSalesPage          from './features/doctorSales/pages/DoctorSalesPage';
+import RawDataPage              from './features/rawData/pages/RawDataPage';
 import TransferConversionUniqueCallsPage from './features/transferConversionUniqueCalls/pages/TransferConversionUniqueCallsPage';
 import TransferAgentWisePage    from './features/transferAgentWise/pages/TransferAgentWisePage';
 
@@ -64,6 +65,7 @@ function App() {
         {activePage === 'doctor-sales'                    && <DoctorSalesPage                    onMenuToggle={() => setMobileOpen((o) => !o)} />}
         {activePage === 'transfer-conversion-unique-calls'&& <TransferConversionUniqueCallsPage  onMenuToggle={() => setMobileOpen((o) => !o)} />}
         {activePage === 'transfer-agent-wise'             && <TransferAgentWisePage              onMenuToggle={() => setMobileOpen((o) => !o)} />}
+        {activePage === 'raw-data'                        && <RawDataPage                        onMenuToggle={() => setMobileOpen((o) => !o)} />}
       </main>
 
     </div>

@@ -108,27 +108,17 @@ export const pgGetTransferAgentWiseData = ({ startDate, endDate }) =>
        campaign_name,
        udh_user_id AS agent_name,
 
-       -- Calls (fixed with DISTINCT)
-       (
-         COUNT(DISTINCT ch_call_id) FILTER (
-           WHERE ch_system_disposition = 'CONNECTED'
-             AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
-         )
-
-         - COUNT(DISTINCT ch_call_id) FILTER (
-           WHERE ch_system_disposition = 'CONNECTED'
-             AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
-             AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'CALL DROP')
+       -- Count unique call IDs matching dialer logic:
+       -- CONNECTED calls, excluding short CALL_DROPs (< 5s talk time).
+       -- Removed "+add-back" for NULL-talk-time customer-hangup CALL_DROPs —
+       -- dialer never counts zero-talk-time records as valid calls.
+       COUNT(DISTINCT ch_call_id) FILTER (
+         WHERE ch_system_disposition = 'CONNECTED'
+           AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
+           AND NOT (
+             UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'CALL DROP')
              AND COALESCE(udh_talk_time, 0) < 5000
-         )
-
-         + COUNT(DISTINCT ch_call_id) FILTER (
-           WHERE ch_system_disposition = 'CONNECTED'
-             AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
-             AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'CALL DROP')
-             AND uch_talk_time IS NULL
-             AND UPPER(COALESCE(ch_hangup_details, '')) IN ('CUSTOMER_HANGUP_PHONE', 'CUSTOMER_HANGUP_UI')
-         )
+           )
        )::int AS calls,
 
        -- Transfers to sales

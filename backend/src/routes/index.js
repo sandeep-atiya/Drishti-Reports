@@ -10,6 +10,7 @@ import salesHydrabadReportRoutes          from './salesHyderabad.report.routes.j
 import doctorSalesReportRoutes            from './doctorSales.report.routes.js';
 import transferUniqueCallsReportRoutes    from './transfer.unique.calls.report.routes.js';
 import transferAgentWiseReportRoutes      from './transfer.agent.wise.report.routes.js';
+import rawDataReportRoutes                from './rawData.report.routes.js';
 
 const router = Router();
 
@@ -34,5 +35,6 @@ router.use('/reports/sales-hyderabad',   salesHydrabadReportRoutes);
 router.use('/reports/doctor-sales',      doctorSalesReportRoutes);
 router.use('/reports/transfer-unique-calls',  transferUniqueCallsReportRoutes);
 router.use('/reports/transfer-agent-wise',    transferAgentWiseReportRoutes);
+router.use('/reports/raw-data',              rawDataReportRoutes);
 
 export default router;

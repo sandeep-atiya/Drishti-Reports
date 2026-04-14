@@ -1,6 +1,6 @@
 import {
   BarChart2, TrendingUp, ArrowRightLeft, PhoneOff, CalendarDays,
-  Layers, Users, ChevronLeft, ChevronRight, X, LogOut, UserCircle,
+  Layers, Users, ChevronLeft, ChevronRight, X, LogOut, UserCircle, Database,
 } from 'lucide-react';
 
 const NAV = [
@@ -17,6 +17,7 @@ const NAV = [
       { id: 'sales-conversion',                  label: 'Sales Conversion',                  icon: Users          },
       { id: 'sales-hyderabad',                   label: 'Sales Hyderabad',                   icon: Users          },
       { id: 'doctor-sales',                      label: 'Doctor Sales',                      icon: Users          },
+      { id: 'raw-data',                          label: 'Raw Data Explorer',                 icon: Database       },
     ],
   },
 ];
