@@ -1,6 +1,13 @@
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Resolve .env relative to this file (src/config/ → ../../.env = backend/.env)
+// This works correctly under IIS/iisnode where process.cwd() is unpredictable.
+dotenv.config({ path: resolve(__dirname, '../../.env') });
 
 const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',
@@ -33,9 +40,11 @@ const env = {
   },
 
   redis: {
-    host: process.env.REDIS_HOST || '127.0.0.1',
-    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+    host:     process.env.REDIS_HOST     || '127.0.0.1',
+    port:     parseInt(process.env.REDIS_PORT, 10) || 6379,
     password: process.env.REDIS_PASSWORD || undefined,
+    username: process.env.REDIS_USER     || undefined,
+    db:       parseInt(process.env.REDIS_DB, 10)  || 0,
   },
 
   // Date range (days) above which the report is processed as a background job
