@@ -28,7 +28,7 @@ const sqliteGetHangupByAgent = ({ startDate, endDate, campaignName }) => {
 
   const rows = db.prepare(`
     SELECT
-      username                   AS agent_name,
+      udh_user_id                AS agent_name,
       SUM(agent_hangup_phone)    AS agent_hangup_phone,
       SUM(agent_hangup_ui)       AS agent_hangup_ui,
       SUM(customer_hangup_phone) AS customer_hangup_phone,
@@ -38,11 +38,11 @@ const sqliteGetHangupByAgent = ({ startDate, endDate, campaignName }) => {
     FROM hangup_daily
     WHERE summary_date >= ?
       AND summary_date <  ?
-      AND username IS NOT NULL
-      AND username <> ''
+      AND udh_user_id IS NOT NULL
+      AND udh_user_id <> ''
       ${campaignFilter}
-    GROUP BY username
-    ORDER BY username
+    GROUP BY udh_user_id
+    ORDER BY udh_user_id
   `).all(...params);
 
   return Promise.resolve(rows);
@@ -88,21 +88,21 @@ const pgGetHangupByAgent = ({ startDate, endDate, campaignName }) => {
 
   return getPGSequelize().query(
     `SELECT
-       username                                                                        AS agent_name,
-       COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'AGENT_HANGUP_PHONE')        AS agent_hangup_phone,
-       COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'AGENT_HANGUP_UI')           AS agent_hangup_ui,
-       COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'CUSTOMER_HANGUP_PHONE')     AS customer_hangup_phone,
-       COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'SYSTEM_HANGUP')             AS system_hangup,
-       COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'SYSTEM_MEDIA')              AS system_media,
-       COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'SYSTEM_RECORDING')          AS system_recording
+       COALESCE(NULLIF(BTRIM(udh_user_id), ''), username)                              AS agent_name,
+       COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'AGENT_HANGUP_PHONE')         AS agent_hangup_phone,
+       COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'AGENT_HANGUP_UI')            AS agent_hangup_ui,
+       COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'CUSTOMER_HANGUP_PHONE')      AS customer_hangup_phone,
+       COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'SYSTEM_HANGUP')              AS system_hangup,
+       COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'SYSTEM_MEDIA')               AS system_media,
+       COUNT(*) FILTER (WHERE UPPER(ch_hangup_details) = 'SYSTEM_RECORDING')           AS system_recording
      FROM acd_interval_denormalized_entity
      WHERE ${startExpr}
        AND ${endExpr}
-       AND username IS NOT NULL
-       AND username <> ''
+       AND COALESCE(NULLIF(BTRIM(udh_user_id), ''), username) IS NOT NULL
+       AND COALESCE(NULLIF(BTRIM(udh_user_id), ''), username) <> ''
        ${campaignFilter}
-     GROUP BY username
-     ORDER BY username`,
+     GROUP BY COALESCE(NULLIF(BTRIM(udh_user_id), ''), username)
+     ORDER BY COALESCE(NULLIF(BTRIM(udh_user_id), ''), username)`,
     {
       replacements: { startDate, endDate, campaignName: campaignName || null },
       type: QueryTypes.SELECT,

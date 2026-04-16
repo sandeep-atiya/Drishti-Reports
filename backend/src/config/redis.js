@@ -14,6 +14,8 @@ export const getRedis = () => {
       host:                 env.redis.host,
       port:                 env.redis.port,
       password:             env.redis.password,
+      username:             env.redis.username,
+      db:                   env.redis.db,
       maxRetriesPerRequest: null,
       enableReadyCheck:     false,
       lazyConnect:          true,

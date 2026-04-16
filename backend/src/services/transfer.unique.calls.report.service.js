@@ -6,7 +6,7 @@ import {
 import { getRedis } from "../config/redis.js";
 import logger from "../utils/logger.js";
 
-const PREFIX = "report:transfer-unique-calls:v8:";
+const PREFIX = "report:transfer-unique-calls:v10:";
 const cacheKey = (s, e) => `${PREFIX}${s}:${e}`;
 
 const getCache = async (s, e) => {

@@ -101,8 +101,7 @@ const dateWiseReportService = {
       const dateStr = toDateStr(row.call_date);   // always a plain string from TO_CHAR
       const calls   = num(row.calls);
 
-      // agent_id  = COALESCE(udh_user_id, username) from PG — same value as doctor_name in MSSQL
-      // agent_name = username from PG — used for display
+      // agent_id / agent_name = udh_user_id from PG — same value as doctor_name in MSSQL
       const key   = `${dateStr}|${agentKey(row.agent_id)}`;
       const stats = orderMap.get(key) || { orders: 0, verified: 0, verifiedAmount: 0 };
 
@@ -121,7 +120,7 @@ const dateWiseReportService = {
 
       return {
         'Date':                 dateStr,
-        'Agents':               row.agent_name || row.agent_id || 'Unknown',
+        'Agents':               row.agent_id || row.agent_name || 'Unknown',
         'Calls':                calls,
         'Orders':               orders,
         'Verified':             verified,

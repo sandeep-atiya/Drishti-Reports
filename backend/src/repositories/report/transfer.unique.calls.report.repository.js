@@ -36,7 +36,7 @@ const PROCESS_FILTER_SQL = `
 //        campaign_name AS process_name,
 
 //        -- Agents (only meaningful for connected calls)
-//        COUNT(DISTINCT COALESCE(udh_user_id, username)) FILTER (
+//        COUNT(DISTINCT udh_user_id) FILTER (
 //          WHERE ch_system_disposition = 'CONNECTED'
 //        )::int AS p_count,
 
@@ -92,7 +92,7 @@ const PROCESS_FILTER_SQL = `
 //        campaign_name AS process_name,
 
 //        -- Agents (only meaningful for connected calls)
-//        COUNT(DISTINCT COALESCE(udh_user_id, username)) FILTER (
+//        COUNT(DISTINCT udh_user_id) FILTER (
 //          WHERE ch_system_disposition = 'CONNECTED'
 //        )::int AS p_count,
 
@@ -149,7 +149,7 @@ const PROCESS_FILTER_SQL = `
 //        campaign_name AS process_name,
 
 //        -- Agents (only meaningful for connected calls)
-//        COUNT(DISTINCT COALESCE(udh_user_id, username)) FILTER (
+//        COUNT(DISTINCT udh_user_id) FILTER (
 //          WHERE ch_system_disposition = 'CONNECTED'
 //        )::int AS p_count,
 
@@ -210,34 +210,21 @@ export const pgGetTransferUniqueCallsData = ({ startDate, endDate }) =>
        campaign_name AS process_name,
 
        -- Agents (only meaningful for connected calls)
-       COUNT(DISTINCT COALESCE(udh_user_id, username)) FILTER (
+       COUNT(DISTINCT udh_user_id) FILTER (
          WHERE ch_system_disposition = 'CONNECTED'
        )::int AS p_count,
 
-       -- Match the manual Excel count more closely:
-       -- 1) count connected rows with a usable phone
-       -- 2) exclude short CALL_DROP rows (< 5s) which the manual workbook
-       --    appears to treat as failed/invalid calls
-       -- 3) keep NULL uch_talk_time customer-hangup call-drops, because they
-       --    are present in the manual sheet for 2026-04-07
-       (
-         COUNT(ch_phone) FILTER (
-           WHERE ch_system_disposition = 'CONNECTED'
-             AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
-         )
-         - COUNT(ch_phone) FILTER (
-           WHERE ch_system_disposition = 'CONNECTED'
-             AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
-             AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'CALL DROP')
+       -- Count unique call IDs matching dialer logic:
+       -- CONNECTED calls, excluding short CALL_DROPs (< 5s talk time).
+       -- Removed the old "+add-back" for NULL-talk-time customer-hangup
+       -- CALL_DROPs — dialer never counts zero-talk-time records as valid calls.
+       COUNT(DISTINCT ch_call_id) FILTER (
+         WHERE ch_system_disposition = 'CONNECTED'
+           AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
+           AND NOT (
+             UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'CALL DROP')
              AND COALESCE(udh_talk_time, 0) < 5000
-         )
-         + COUNT(ch_phone) FILTER (
-           WHERE ch_system_disposition = 'CONNECTED'
-             AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
-             AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'CALL DROP')
-             AND uch_talk_time IS NULL
-             AND UPPER(COALESCE(ch_hangup_details, '')) IN ('CUSTOMER_HANGUP_PHONE', 'CUSTOMER_HANGUP_UI')
-         )
+           )
        )::int AS calls,
 
 
@@ -260,6 +247,8 @@ export const pgGetTransferUniqueCallsData = ({ startDate, endDate }) =>
      WHERE
         rec_no = 1
         AND first_queue_answered = 't'
+        AND udh_user_id IS NOT NULL
+        AND BTRIM(udh_user_id) <> ''
 
         AND ${PROCESS_FILTER_SQL}
 

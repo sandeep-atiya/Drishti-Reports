@@ -79,9 +79,8 @@ const drishtiReportService = {
 
     // ── Step 3: orders queries in parallel (SQLite when ready, MSSQL fallback) ──
     const t1 = Date.now();
-    const [mssqlCampaignRows, mssqlAgentRows] = await Promise.all([
+    const [mssqlCampaignRows] = await Promise.all([
       drishtiReportRepository.getOrdersByCampaign({ startDate, endDate, campaignIds }),
-      drishtiReportRepository.getOrdersByAgent({ startDate, endDate, campaignIds }),
     ]);
     logger.info(`[PERF] Orders queries done in ${Date.now() - t1}ms`);
 
@@ -110,39 +109,7 @@ const drishtiReportService = {
       };
     });
 
-    // ── Step 5: build agent table ─────────────────────────────────────────
-    const agentOrdersMap = {};
-    for (const row of mssqlAgentRows) {
-      const key = String(row.AgentID);
-      if (!agentOrdersMap[key]) agentOrdersMap[key] = { orders: 0, verified: 0, verified_amount: 0 };
-      agentOrdersMap[key].orders          += Number(row.orders)          || 0;
-      agentOrdersMap[key].verified        += Number(row.verified)        || 0;
-      agentOrdersMap[key].verified_amount += Number(row.verified_amount) || 0;
-    }
-
-    const agentCallsMap = {};
-    for (const r of pgAgentRows) {
-      const key = r.udh_user_id || 'unknown';
-      if (!agentCallsMap[key]) {
-        agentCallsMap[key] = { agent: r.username || r.udh_user_id || 'Unknown', agentId: r.udh_user_id, calls: 0 };
-      }
-      agentCallsMap[key].calls += Number(r.calls) || 0;
-    }
-
-    const agentData = Object.values(agentCallsMap).map((a) => {
-      const ord = agentOrdersMap[String(a.agentId)] || {};
-      return {
-        agent: a.agent,
-        ...metrics({
-          calls:          a.calls,
-          orders:         ord.orders          || 0,
-          verified:       ord.verified        || 0,
-          verifiedAmount: ord.verified_amount || 0,
-        }),
-      };
-    });
-
-    const result = { campaignData, agentData };
+    const result = { campaignData };
     logger.info(`[PERF] Total: ${Date.now() - t0}ms`);
 
     // Store in cache (fire-and-forget — setCachedReport handles its own errors internally)

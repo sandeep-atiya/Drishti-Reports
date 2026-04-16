@@ -60,30 +60,50 @@ export const pgGetCallsByAgentCampaign = ({ startDate, endDate }) => {
 
   return getPGSequelize().query(
     `SELECT
-       COALESCE(udh_user_id, username)              AS agent_id,
-       username                                     AS agent_name,
+       udh_user_id                                  AS agent_id,
+       udh_user_id                                  AS agent_name,
        campaign_name,
        ch_campaign_id,
-       COUNT(DISTINCT ch_call_id)::int              AS calls
+       (
+         COUNT(DISTINCT ch_call_id) FILTER (
+           WHERE ch_system_disposition = 'CONNECTED'
+             AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
+         )
+         - COUNT(DISTINCT ch_call_id) FILTER (
+           WHERE ch_system_disposition = 'CONNECTED'
+             AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
+             AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'Call Drop')
+             AND COALESCE(udh_talk_time, 0) <= 5000
+         )
+         + COUNT(DISTINCT ch_call_id) FILTER (
+           WHERE ch_system_disposition = 'CONNECTED'
+             AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
+             AND UPPER(COALESCE(udh_disposition_code, '')) IN ('CALL_DROP', 'Call Drop')
+             AND uch_talk_time IS NULL
+             AND UPPER(COALESCE(ch_hangup_details, '')) IN ('CUSTOMER_HANGUP_PHONE', 'CUSTOMER_HANGUP_UI')
+         )
+         - COUNT(DISTINCT ch_call_id) FILTER (
+           WHERE ch_system_disposition = 'CONNECTED'
+             AND NULLIF(BTRIM(ch_phone), '') IS NOT NULL
+             AND LOWER(COALESCE(udh_disposition_code, '')) = 'failed.association'
+         )
+       )::int AS calls
      FROM acd_interval_denormalized_entity
      WHERE ${startExpr}
        AND ${endExpr}
        AND ${CAMPAIGN_ILIKE}
        AND NOT (
              campaign_name ILIKE 'Unayur_IN'
+         AND queue_name IS NOT NULL
          AND queue_name IN ('Verification_PendingAgentQueue', 'FreshAgentQueue')
        )
-       AND COALESCE(udh_user_id, username) IS NOT NULL
-       AND COALESCE(udh_user_id, username) <> ''
-       AND uch_talk_time > 5
-       AND (ch_hangup_details IS NULL OR ch_hangup_details NOT IN ('Customer_Hangup_Phone', 'Customer_hangup_ui'))
-       AND udh_disposition_code IS DISTINCT FROM 'CALL_DROP'
+       AND udh_user_id IS NOT NULL
+       AND udh_user_id <> ''
      GROUP BY
-       COALESCE(udh_user_id, username),
-       username,
+       udh_user_id,
        campaign_name,
        ch_campaign_id
-     ORDER BY campaign_name, username`,
+     ORDER BY campaign_name, udh_user_id`,
     {
       replacements: { startDate, endDate },
       type: QueryTypes.SELECT,
